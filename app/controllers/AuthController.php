@@ -70,13 +70,18 @@ class AuthController
 
             $this->model->updateLastLogin($user['id']);
 
-            if ($user['role'] === 'Admin') {
-                header('Location: /pos/public/dashboard');
-            } else {
-                header('Location: /pos/public/sales');
-            }
-            exit;
-        }
+           if ($user['role'] === 'admin') {
+            header('Location: /pos/public/dashboard');
+           } elseif ($user['role'] === 'cashier') {
+            header('Location: /pos/public/sales/pos');
+           } elseif ($user['role'] === 'inventory_clerk') {
+            header('Location: /pos/public/products/inventory_clerk_dashboard');
+           } else {
+            $_SESSION['error'] = 'Invalid user role';
+            header('Location: /pos/public/login');
+           }
+         exit;
+           }
         $this->showLoginForm();
     }
 

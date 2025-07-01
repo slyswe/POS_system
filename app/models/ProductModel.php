@@ -88,6 +88,7 @@ class ProductModel
             $stmt->execute();
             $result = $stmt->get_result();
             $products = $result->fetch_all(MYSQLI_ASSOC);
+            error_log(print_r($products, true));
             $stmt->close();
             return $products;
         } catch (Exception $e) {
@@ -129,7 +130,10 @@ class ProductModel
             $stmt->bind_param("siddsi", $data['name'], $categoryId, $data['price'], $data['stock'], $barcode, $id);
             $success = $stmt->execute();
             $stmt->close();
+            $this->db->commit();
             return $success;
+            
+
         } catch (Exception $e) {
             error_log("Error updating product: " . $e->getMessage());
             return false;
@@ -142,6 +146,7 @@ class ProductModel
             if (!in_array($field, ['name', 'price', 'stock'])) {
                 throw new Exception("Invalid field: $field");
             }
+            
             $query = "UPDATE products SET $field = ? WHERE id = ?";
             $stmt = $this->db->prepare($query);
             if ($stmt === false) {
@@ -179,4 +184,55 @@ class ProductModel
             return false;
         }
     }
+
+    public function adjustProductStock($id, $change, $reason)
+{
+    try {
+        $this->db->begin_transaction();
+        $stmt = $this->db->prepare("SELECT stock FROM products WHERE id = ? FOR UPDATE");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($row = $result->fetch_assoc()) {
+            $newStock = $row['stock'] + $change;
+            if ($newStock < 0) {
+                throw new Exception("Cannot reduce stock below zero");
+            }
+            $stmt = $this->db->prepare("UPDATE products SET stock = ? WHERE id = ?");
+            $stmt->bind_param("ii", $newStock, $id);
+            $stmt->execute();
+            $stmt = $this->db->prepare("INSERT INTO stock_adjustments (product_id, change_amount, reason, adjusted_by) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("iisi", $id, $change, $reason, $_SESSION['user']['id']);
+            $stmt->execute();
+            $this->db->commit();
+            return $newStock;
+        }
+        $this->db->rollback();
+        return false;
+    } catch (Exception $e) {
+        $this->db->rollback();
+        error_log("Stock adjustment error: " . $e->getMessage());
+        return false;
+    }
+}
+
+public function search(string $term): array
+{
+    try {
+        $likeTerm = '%' . $term . '%';
+        $stmt = $this->db->prepare("SELECT * FROM products WHERE (name LIKE ? OR barcode LIKE ?) AND active = 1");
+        if ($stmt === false) {
+            throw new Exception("Prepare failed: " . $this->db->error);
+        }
+        $stmt->bind_param("ss", $likeTerm, $likeTerm);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $products = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $products;
+    } catch (Exception $e) {
+        error_log("Error searching products: " . $e->getMessage());
+        return [];
+    }
+}
 }

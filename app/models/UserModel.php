@@ -9,7 +9,7 @@ class UserModel
 
     public function __construct()
     {
-        require_once BASE_PATH . '../config/database.php';
+        require_once BASE_PATH . './config/database.php';
         $this->conn = getDbConnection();
         if ($this->conn->connect_error) {
             throw new Exception("Database connection failed: " . $this->conn->connect_error);
@@ -83,7 +83,7 @@ class UserModel
     {
         try {
             $password_hash = password_hash($data['password'], PASSWORD_DEFAULT);
-            $role = in_array($data['role'], ['Admin', 'Cashier', 'Inventory Clerk']) ? $data['role'] : 'Cashier';
+            $role = in_array($data['role'], ['admin', 'cashier', 'inventory_clerk']) ? $data['role'] : 'cashier';
             $stmt = $this->conn->prepare("
                 INSERT INTO users (name, email, password_hash, address, phone, status, role) 
                 VALUES (?, ?, ?, ?, ?, ?, ?)

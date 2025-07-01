@@ -1,7 +1,6 @@
 <?php
-session_start();
 
-if (!isset($_SESSION['user']) || !is_array($_SESSION['user']) || $_SESSION['user']['role'] !== 'Admin') {
+if (!isset($_SESSION['user']) || !is_array($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
     header('Location: /pos/public/login');
     exit;
 }
@@ -12,7 +11,7 @@ $products = $products ?? [];
 $total = $total ?? count($products); // Assume total is count if not set
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $perPage = $perPage ?? 10;
-$user = $_SESSION['user'] ?? ['name' => 'Admin User', 'id' => '10001'];
+$user = $_SESSION['user'] ?? ['name' => 'Admin', 'id' => '10001'];
 
 // Group products by category
 $grouped_products = [];
@@ -198,7 +197,7 @@ foreach ($products as $product) {
                                                 aria-label="Toggle inline edit for product">
                                             <i class="fas fa-pencil-alt" aria-hidden="true"></i>
                                         </button>
-                                        <a href="/pos/public/products/edit/<?= $product['id'] ?>" 
+                                        <a href="/pos/public/products/edit/<?= htmlspecialchars($product['id']) ?>" 
                                            class="btn btn-edit" aria-label="Edit product details">
                                             <i class="fas fa-edit" aria-hidden="true"></i>
                                         </a>
@@ -541,13 +540,13 @@ body {
     background-color: #ef4444;
 }
 .btn-theme-toggle, .btn-logout {
-    background-color: #6b7280;
-    color: #fff;
+    /* background-color: #6b7280; */
+    color: white;
     border: none;
     padding: 8px;
     border-radius: 6px;
-    width: 40px;
-    height: 40px;
+    width: 20px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -688,8 +687,8 @@ body {
     border-bottom: 1px solid #e5e7eb;
 }
 .products-table th {
-    background-color: #f3f4f6;
-    color: #374151;
+    background-color:rgb(224, 227, 232);
+    color:rgb(40, 46, 56);
     font-weight: 600;
 }
 .products-table th.sortable {
@@ -700,7 +699,7 @@ body {
     outline: 2px solid #1e3a8a;
 }
 .products-table tbody tr:hover {
-    background-color: #f9fafb;
+    background-color:rgb(236, 242, 244);
 }
 .inline-edit {
     width: 100%;

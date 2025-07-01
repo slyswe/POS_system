@@ -1,6 +1,6 @@
 <?php
 // Role check
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Inventory Clerk') {
+if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'inventory_clerk') {
     header('Location: /pos/public/login');
     exit;
 }
@@ -11,7 +11,7 @@ $products = $products ?? [];
 $total = $total ?? 0;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $perPage = $perPage ?? 10;
-$clerk = $_SESSION['clerk'] ?? ['name' => 'John Doe', 'id' => '12345'];
+$clerk = $_SESSION['clerk'] ?? ['name' => 'Clerk1', 'id' => '12345'];
 
 // Group products by category
 $grouped_products = [];
@@ -39,8 +39,8 @@ foreach ($products as $product) {
         <div class="header-left">
             <h1 class="page-title"><?= htmlspecialchars($title) ?></h1>
             <nav class="breadcrumbs" aria-label="Breadcrumb">
-                <a href="/pos/public/products" class="breadcrumb-link">Dashboard</a> 
-                <span class="breadcrumb-separator" aria-hidden="true">></span>
+                <!-- <a href="/pos/public/products" class="breadcrumb-link">Dashboard</a> 
+                <span class="breadcrumb-separator" aria-hidden="true">></span> -->
                 <span class="breadcrumb-current" aria-current="page">Stock Management</span>
             </nav>
         </div>
@@ -468,7 +468,7 @@ body {
     padding: 15px 20px;
     border-radius: 8px;
     box-shadow: 0 3px 6px rgba(0,0,0,0.1);
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 .header-left {
     display: flex;
@@ -510,7 +510,7 @@ body {
 .connectivity-status.offline {
     background-color: #ef4444;
 }
-.btn-theme-toggle, .btn-logout {
+.btn-theme-toggle {
     background-color: #6b7280;
     color: #fff;
     border: none;
@@ -523,14 +523,17 @@ body {
     justify-content: center;
     cursor: pointer;
 }
+.btn-logout{
+    color: white
+}
 .btn-theme-toggle:hover, .btn-theme-toggle:focus, 
-.btn-logout:hover, .btn-logout:focus {
+.btn-logout:hover {
     background-color: #4b5563;
-    outline: 2px solid #fff;
+    outline: 0px solid #fff;
 }
-.btn-logout:hover, .btn-logout:focus {
+/* .btn-logout:hover, .btn-logout:focus {
     background-color: #dc2626;
-}
+} */
 .alerts-section {
     margin-bottom: 20px;
 }

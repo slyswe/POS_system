@@ -7,7 +7,7 @@ class CategoryModel {
     private $db;
 
     public function __construct() {
-        require_once __DIR__ . '/../config/database.php';
+        require_once dirname(__DIR__, 2) . '/config/database.php';
         $this->db = getDbConnection();
         if ($this->db->connect_error) {
             throw new Exception("Database connection failed: " . $this->db->connect_error);

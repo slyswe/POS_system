@@ -1,18 +1,18 @@
 <?php
-session_start();
+//session_start();
 
 //if (!defined('IN_CONTROLLER')) {
     //die('Direct access not allowed');
 //}
 
-if (!isset($_SESSION['user']) || !is_array($_SESSION['user']) || $_SESSION['user']['role'] !== 'Admin') {
+if (!isset($_SESSION['user']) || !is_array($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
     header('Location: /pos/public/login');
     exit;
 }
 
 $title = "Admin Dashboard";
 $user_name = htmlspecialchars($_SESSION['user']['name'] ?? 'Admin User');
-$role = htmlspecialchars($_SESSION['user']['role'] ?? 'Admin');
+$role = htmlspecialchars($_SESSION['user']['role'] ?? 'admin');
 
 // Ensure variables are set
 $stats = $stats ?? [
@@ -24,8 +24,6 @@ $stats = $stats ?? [
     'daily_sales' => 0,
     'daily_transactions' => 0
 ];
-$top_products = $top_products ?? [];
-$recent_sales = $recent_sales ?? [];
 $chart_labels = $chart_labels ?? [];
 $chart_data = $chart_data ?? [];
 ?>
@@ -222,16 +220,8 @@ $chart_data = $chart_data ?? [];
             background-color: #d1fae5;
             color: #065f46;
         }
-        .stats-section, .charts-section, .top-products-section, .recent-sales-section {
+        .stats-section, .charts-section {
             margin-bottom: 30px;
-        }
-        .canvas-container {
-            height: 350px;
-            width: 70%;
-        }
-        #salesChart {
-            width: 100% !important;
-            height: 100% !important;
         }
         .section-header {
             display: flex;
@@ -297,28 +287,17 @@ $chart_data = $chart_data ?? [];
         .btn-info:hover {
             background-color: #1e40af;
         }
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: #fff;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
-        }
-        .table th, .table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .table th {
-            background-color: #f9fafb;
-            color: #374151;
-        }
         .canvas-container {
             background-color: #fff;
             padding: 15px;
             border-radius: 8px;
             box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+            height: 350px;
+            width: 70%;
+        }
+        #salesChart {
+            width: 100% !important;
+            height: 100% !important;
         }
         .dark-theme {
             background-color: #1f2937;
@@ -352,7 +331,7 @@ $chart_data = $chart_data ?? [];
         .dark-theme .dashboard-header {
             background: linear-gradient(90deg, #374151, #4b5563);
         }
-        .dark-theme .stat-card, .dark-theme .table, .dark-theme .canvas-container {
+        .dark-theme .stat-card, .dark-theme .canvas-container {
             background-color: #374151;
         }
         .dark-theme .stat-title {
@@ -375,10 +354,6 @@ $chart_data = $chart_data ?? [];
         }
         .dark-theme .connectivity-status.offline {
             background-color: #f87171;
-        }
-        .dark-theme .table th {
-            background-color: #4b5563;
-            color: #d1d5db;
         }
         @media (max-width: 992px) {
             .sidebar {
@@ -409,7 +384,7 @@ $chart_data = $chart_data ?? [];
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2 class="sidebar-title">Admin Dashboard</h2>
+                <h2 class="sidebar-title">Dashboard</h2>
                 <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
                     <i class="fas fa-bars"></i>
                 </button>
@@ -421,15 +396,18 @@ $chart_data = $chart_data ?? [];
                 <a href="/pos/public/products" class="nav-item">
                     <i class="fas fa-box"></i> <span>Inventory</span>
                 </a>
-                <a href="/pos/public/sales/pos" class="nav-item">
-                    <i class="fas fa-dollar-sign"></i> <span>POS</span>
+                <a href="/pos/public/sales_repo" class="nav-item">
+                    <i class="fas fa-shopping-cart"></i> <span>Sales</span>
                 </a>
-                <?php if (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'Admin'): ?>
+                <?php if (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin'): ?>
                     <a href="/pos/public/users" class="nav-item">
-                        <i class="fas fa-users"></i> <span>Users</span>
+                        <i class="fas fa-users"></i> <span>Staff</span>
                     </a>
                     <a href="/pos/public/suppliers" class="nav-item">
                         <i class="fas fa-truck"></i> <span>Suppliers</span>
+                    </a>
+                    <a href="" class="nav-item">
+                        <i class="fas fa-user-friends"></i> <span>Customers</span>
                     </a>
                 <?php endif; ?>
             </nav>
@@ -448,13 +426,13 @@ $chart_data = $chart_data ?? [];
             <!-- Header -->
             <header class="dashboard-header">
                 <div class="header-left">
-                    <h1 class="dashboard-title">Admin Dashboard</h1>
+                    <h1 class="dashboard-title">Dashboard</h1>
                     <span class="connectivity-status" id="connectivity-status">Online</span>
                 </div>
                 <div class="header-right">
                     <span class="last-updated">Last Updated: <span id="current-time"><?php echo date('Y-m-d H:i:s'); ?></span></span>
                     <div class="header-actions">
-                        <button class="btn btn-theme-toggle" onclick="toggleTheme()" id="btn-theme-toggle" title="Toggle Theme" aria-label="Toggle Theme">
+                        <button class="btn-theme-toggle" onclick="toggleTheme()" id="btn-theme-toggle" title="Toggle Theme" aria-label="Toggle Theme">
                             <i class="fas fa-moon"></i>
                         </button>
                     </div>
@@ -554,68 +532,6 @@ $chart_data = $chart_data ?? [];
                     <canvas id="salesChart"></canvas>
                 </div>
             </section>
-
-            <!-- Top Products Section -->
-            <section class="top-products-section">
-                <div class="section-header">
-                    <h3 class="section-title">Top-Selling Products (Last 30 Days)</h3>
-                </div>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Product Name</th>
-                            <th>Quantity Sold</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!empty($top_products)): ?>
-                            <?php foreach ($top_products as $product): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($product['name']); ?></td>
-                                    <td><?php echo number_format($product['total_sold']); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="2">No sales in the past 30 days.</td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </section>
-
-            <!-- Recent Sales Section -->
-            <section class="recent-sales-section">
-                <div class="section-header">
-                    <h3 class="section-title">Recent Sales</h3>
-                </div>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Total</th>
-                            <th>Cashier</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!empty($recent_sales)): ?>
-                            <?php foreach ($recent_sales as $sale): ?>
-                                <tr>
-                                    <td><?php echo $sale['id']; ?></td>
-                                    <td><?php echo number_format($sale['total'], 2); ?> KSh</td>
-                                    <td><?php echo htmlspecialchars($sale['cashier'] ?? 'N/A'); ?></td>
-                                    <td><?php echo date('Y-m-d H:i:s', strtotime($sale['timestamp'])); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="4">No recent sales.</td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </section>
         </main>
     </div>
 
@@ -668,38 +584,66 @@ $chart_data = $chart_data ?? [];
         }
 
         // Sales chart
-        const ctx = document.getElementById('salesChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: <?php echo json_encode($chart_labels); ?>,
-                datasets: [{
-                    label: 'Daily Sales (KSh)',
-                    data: <?php echo json_encode($chart_data); ?>,
-                    borderColor: '#1e3a8a',
-                    backgroundColor: 'rgba(30, 58, 138, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Sales (KSh)'
-                        }
-                    }
+        const ctx = document.getElementById('salesChart')?.getContext('2d');
+        if (!ctx) {
+            console.error('Sales chart canvas not found');
+        } else {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: <?php echo is_array($chart_labels) ? json_encode($chart_labels) : json_encode([]); ?>,
+                    datasets: [{
+                        label: 'Daily Sales (KSh)',
+                        data: <?php echo is_array($chart_data) ? json_encode($chart_data) : json_encode([]); ?>,
+                        borderColor: '#1e3a8a',
+                        backgroundColor: 'rgba(30, 58, 138, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2
+                    }]
                 },
-                plugins: {
-                    legend: {
-                        display: true
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Sales (KSh)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return 'KSh ' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'KSh ' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    elements: {
+                        point: {
+                            radius: 4,
+                            hoverRadius: 6
+                        }
+                    },
+                    animation: {
+                        duration: 1000
                     }
                 }
-            }
-        });
+            });
+        }
     </script>
 </body>
 </html>

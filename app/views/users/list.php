@@ -408,8 +408,8 @@ $controller->index();
             background-color: #4b5563;
         }
         .btn-edit {
-            background-color: #f59e0b;
-            color: #fff;
+            /* background-color: #f59e0b; */
+            color: blue;
             padding: 6px;
             width: 30px;
             height: 30px;
@@ -421,8 +421,8 @@ $controller->index();
             background-color: #d97706;
         }
         .btn-delete {
-            background-color: #ef4444;
-            color: #fff;
+            
+            color: #1e40af;
             padding: 6px;
             width: 30px;
             height: 30px;
