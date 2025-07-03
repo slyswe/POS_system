@@ -409,6 +409,9 @@ $chart_data = $chart_data ?? [];
                     <a href="" class="nav-item">
                         <i class="fas fa-user-friends"></i> <span>Customers</span>
                     </a>
+                    <a href="" class="nav-item">
+                        <i class="fas fa-dollar-sign"></i> <span>Finances</span>
+                    </a>
                 <?php endif; ?>
             </nav>
             <div class="sidebar-footer">

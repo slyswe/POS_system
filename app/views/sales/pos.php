@@ -694,74 +694,28 @@ function updateQuantity(productId, newQuantity) {
         // Customer lookup function with debouncing
         let debounceTimeout;
         function lookupCustomer() {
-        clearTimeout(debounceTimeout);
-        debounceTimeout = setTimeout(() => {
         const query = document.getElementById('customer-lookup').value.trim();
-        const lookupBtn = document.querySelector('.btn-customer-lookup');
-        const baseUrl = document.querySelector('meta[name="base-url"]').content;
-        const lookupUrl = `${baseUrl}/customer/lookup?q=${encodeURIComponent(query)}`;
+    if (!query) {
+        showAlert('error', 'Please enter a phone or email');
+        return;
+    }
 
-        if (!query) {
-            showAlert('error', 'Please enter a customer phone or email.');
-            return;
-        }
-
-        if (query.length > 100 || /[<>{}]/g.test(query)) {
-            showAlert('error', 'Invalid input. Please use a valid phone number or email.');
-            return;
-        }
-
-        if (!navigator.onLine) {
-            const cached = localStorage.getItem(`customer_${query}`);
-            if (cached) {
-                const data = JSON.parse(cached);
-                displayCustomerDetails(data.customer, data.history);
-                showAlert('info', 'Showing cached customer data (offline mode).');
-                return;
-            }
-            showAlert('error', 'Offline mode: No cached data available.');
-            return;
-        }
-
-        lookupBtn.disabled = true;
-        lookupBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching';
-        document.getElementById('customer-details').innerHTML = '<div class="loading">Loading...</div>';
-
-        console.log('Sending request to:', lookupUrl); // Debug log
-        fetch(lookupUrl, {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json'
-            }
-        })
+    fetch(`/pos/public/customer/lookup?q=${encodeURIComponent(query)}`)
         .then(response => {
-            console.log('Response status:', response.status); // Debug log
-            if (!response.ok) {
-                return response.text().then(text => {
-                    throw new Error(`HTTP ${response.status}: ${text}`);
-                });
-            }
+            if (!response.ok) throw new Error('Network error');
             return response.json();
         })
         .then(data => {
             if (data.success) {
-                localStorage.setItem(`customer_${query}`, JSON.stringify(data));
                 displayCustomerDetails(data.customer, data.history);
-                showAlert('success', 'Customer found successfully.');
             } else {
-                showAlert('info', data.message || 'Customer not found. Would you like to create a new customer?');
-                document.getElementById('customer-details').style.display = 'none';
+                showAlert('error', data.message || 'Customer not found');
             }
         })
         .catch(error => {
-            console.error('Customer lookup error:', error);
-            showAlert('error', `Failed to lookup customer: ${error.message}`);
-        })
-        .finally(() => {
-            lookupBtn.disabled = false;
-            lookupBtn.textContent = 'Lookup';
+            console.error('Lookup failed:', error);
+            showAlert('error', 'Failed to fetch customer');
         });
-    }, 300);
 }
 
         // Autocomplete for customer lookup---with client-side validation(for email and phone formarts).

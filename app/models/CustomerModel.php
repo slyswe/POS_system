@@ -18,23 +18,22 @@ class CustomerModel {
     }
 
     public function findCustomer($searchTerm) {
-        try {
-            $stmt = $this->db->prepare("
-                SELECT * FROM customers 
-                WHERE phone = ? OR email = ?
-                LIMIT 1
-            ");
-            
-            $stmt->bind_param("ss", $searchTerm, $searchTerm);
-            $stmt->execute();
-            
-            $result = $stmt->get_result();
-            return $result->fetch_assoc();
-            
-        } catch (Exception $e) {
-            error_log("findCustomer error: " . $e->getMessage());
-            throw $e;
-        }
+        error_log("[DB Query] Searching customer: " . $searchTerm);
+    
+    $query = "SELECT * FROM customers WHERE phone = ? OR email = ? LIMIT 1";
+    error_log("[DB Query] SQL: " . $query);
+    
+    $stmt = $this->db->prepare($query);
+    if (!$stmt) {
+        error_log("[DB Error] Prepare failed: " . $this->db->error);
+        return null;
+    }
+    
+    $stmt->bind_param("ss", $searchTerm, $searchTerm);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
     }
 
     public function getPurchaseHistory($customerId, $limit = 5) {

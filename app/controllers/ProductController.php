@@ -32,8 +32,64 @@ class ProductController
         $filter = filter_input(INPUT_GET, 'filter') === 'low_stock' ? 'low_stock' : '';
         $products = $this->model->getAllProducts($page, $perPage, $filter);
         $total = $this->model->getTotalProducts($filter);
+        $suppliers = $this->getSuppliers();
+
         define('IN_CONTROLLER', true);
         include BASE_PATH . 'app/views/products/inventory_clerk_dashboard.php';
+    }
+
+    public function getNextInvoiceNumber()
+{
+    $date = filter_input(INPUT_GET, 'date', FILTER_SANITIZE_STRING) ?: date('Ymd');
+    $invoiceNumber = 'INV-' . $date . '-' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT);
+    
+    header('Content-Type: application/json');
+    echo json_encode(['success' => true, 'invoiceNumber' => $invoiceNumber]);
+    exit;
+}
+
+public function fetchSuppliers()
+{
+    $conn = new \mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+    if ($conn->connect_error) {
+        echo json_encode(['success' => false, 'message' => 'Database connection failed']);
+        exit;
+    }
+    
+    $suppliers = [];
+    $result = $conn->query("SELECT id, name FROM suppliers ORDER BY name ASC");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $suppliers[] = $row;
+        }
+        $result->free();
+    }
+    $conn->close();
+    
+    header('Content-Type: application/json');
+    echo json_encode(['success' => true, 'suppliers' => $suppliers]);
+    exit;
+}
+
+    private function getSuppliers()
+    {
+        $conn = new \mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+        if ($conn->connect_error) {
+            error_log("Database connection failed: " . $conn->connect_error);
+            return [];
+        }
+        
+        $suppliers = [];
+        $result = $conn->query("SELECT id, name FROM suppliers ORDER BY name ASC");
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $suppliers[] = $row;
+            }
+            $result->free();
+        }
+        $conn->close();
+        
+        return $suppliers;
     }
 
     public function index()

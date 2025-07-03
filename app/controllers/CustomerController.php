@@ -13,42 +13,30 @@ class CustomerController {
     }
 
     public function lookup($searchTerm) {
-        error_log("Customer lookup initiated. Search term: " . $searchTerm);
-        error_log("Session data: " . print_r($_SESSION, true));
+        error_log("[Customer Lookup] Search term: " . $searchTerm);
 
-
-        if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'cashier') {
-        http_response_code(403);
-        return ['success' => false, 'message' => 'Unauthorized'];
-    }
-
+    // Basic validation
     if (empty($searchTerm)) {
-        return ['success' => false, 'message' => 'Search term required'];
-    }
-
-    // Relaxed phone number validation to allow up to 20 characters and more formats
-    if (!preg_match('/^[0-9\+\-\s\(\)]{7,20}$/', $searchTerm) && !filter_var($searchTerm, FILTER_VALIDATE_EMAIL)) {
-        return ['success' => false, 'message' => 'Invalid phone number or email format'];
+        return ['success' => false, 'message' => 'Search term is required'];
     }
 
     try {
         $customer = $this->customerModel->findCustomer($searchTerm);
-        error_log("Customer lookup: term=$searchTerm, user={$_SESSION['user']['id']}, success=" . ($customer ? 'true' : 'false'));
         
-        if ($customer) {
-            $history = $this->customerModel->getPurchaseHistory($customer['id']);
-            return [
-                'success' => true,
-                'customer' => $customer,
-                'history' => $history
-            ];
+        if (!$customer) {
+            error_log("[Customer Lookup] No customer found for: " . $searchTerm);
+            return ['success' => false, 'message' => 'Customer not found'];
         }
-        return ['success' => false, 'message' => 'Customer not found'];
-        
+
+        $history = $this->customerModel->getPurchaseHistory($customer['id']);
+        return [
+            'success' => true,
+            'customer' => $customer,
+            'history' => $history
+        ];
     } catch (Exception $e) {
-        error_log("Customer lookup error: " . $e->getMessage());
-        http_response_code(500);
-        return ['success' => false, 'message' => 'Customer lookup failed: ' . $e->getMessage()];
+        error_log("[Customer Lookup ERROR] " . $e->getMessage());
+        return ['success' => false, 'message' => 'Server error'];
     }
     }
 

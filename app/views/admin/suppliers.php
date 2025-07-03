@@ -172,7 +172,7 @@ $role = htmlspecialchars($_SESSION['user']['role'] ?? 'admin');
                                     <tr>
                                         <th>Product</th>
                                         <th>Quantity</th>
-                                        <th>Unit Price</th>
+                                        <th>Buying price</th>
                                         <th>Total</th>
                                         <th>Remove</th>
                                     </tr>

@@ -286,7 +286,7 @@ $pending_approvals = $pending_approvals ?? [];
         .filters-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
+            gap: 60px;
             align-items: center;
         }
         .filters-grid input, .filters-grid select {
@@ -357,6 +357,10 @@ $pending_approvals = $pending_approvals ?? [];
             box-shadow: 0 3px 6px rgba(0,0,0,0.1);
             height: 350px;
         }
+        /* .canvas-container h4{
+
+
+        } */
         #salesByHourChart, #paymentMethodsChart {
             width: 100% !important;
             height: 100% !important;
@@ -612,11 +616,7 @@ $pending_approvals = $pending_approvals ?? [];
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <select>
-                        <option>All Locations</option>
-                        <option>Main Street</option>
-                        <option>Downtown</option>
-                    </select>
+                    
                     <button>Filter</button>
                 </div>
             </section>
@@ -627,10 +627,14 @@ $pending_approvals = $pending_approvals ?? [];
                     <h3 class="section-title">Sales Analytics</h3>
                 </div>
                 <div class="charts-grid">
+                    
                     <div class="canvas-container">
+                        <h4>Today's sales per hour</h4>
                         <canvas id="salesByHourChart"></canvas>
                     </div>
+                    
                     <div class="canvas-container">
+                        <h4>Today's payment method collection</h4>
                         <canvas id="paymentMethodsChart"></canvas>
                     </div>
                 </div>

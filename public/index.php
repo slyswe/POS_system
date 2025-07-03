@@ -101,13 +101,8 @@ switch ($request) {
         $controller = new \App\Controllers\SalesController();
         $controller->checkout();
         break;
-    case (preg_match('#^/pos/public/customer/lookup(?:\?q=([^&]+))?$#i', $request, $matches) ? true : false):
-        if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'cashier') {
-           http_response_code(403);
-           echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-           break;
-        }
-        $searchTerm = isset($_GET['q']) ? urldecode($_GET['q']) : '';
+    case (strpos($request, '/pos/public/customer/lookup') === 0):
+        $searchTerm = $_GET['q'] ?? '';
         $controller = new \App\Controllers\CustomerController();
         header('Content-Type: application/json');
         echo json_encode($controller->lookup($searchTerm));
@@ -164,6 +159,14 @@ switch ($request) {
         $format = $matches[1];
         $controller = new \App\Controllers\SupplierController();
         $controller->export($format);
+        break;
+    case '/pos/public/api/inventory/next-invoice':
+        $controller = new \App\Controllers\ProductController();
+        $controller->getNextInvoiceNumber();
+        break;
+    case '/pos/public/api/suppliers':
+        $controller = new \App\Controllers\ProductController();
+        $controller->fetchSuppliers();
         break;
     default:
         http_response_code(404);

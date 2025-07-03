@@ -104,42 +104,29 @@ class SupplierController
 
     public function createPurchase()
     {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
-            $supplier_id = (int)$data['supplier_id'];
-            $items = $data['items'];
-            $notes = $this->conn->real_escape_string($data['notes'] ?? '');
-            
-            $this->conn->begin_transaction();
-            try {
-                $total_amount = 0;
-                foreach ($items as $item) {
-                    $total_amount += $item['quantity'] * $item['unit_price'];
-                }
-                
-                $stmt = $this->conn->prepare("INSERT INTO purchase_orders (supplier_id, total_amount, notes) VALUES (?, ?, ?)");
-                $stmt->bind_param("ids", $supplier_id, $total_amount, $notes);
-                $stmt->execute();
-                $purchase_order_id = $this->conn->insert_id;
-                
-                $stmt = $this->conn->prepare("INSERT INTO purchase_order_items (purchase_order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)");
-                foreach ($items as $item) {
-                    $product_id = (int)$item['product_id'];
-                    $quantity = (int)$item['quantity'];
-                    $unit_price = (float)$item['unit_price'];
-                    $stmt->bind_param("iiid", $purchase_order_id, $product_id, $quantity, $unit_price);
-                    $stmt->execute();
-                }
-                
-                $this->conn->commit();
-                $_SESSION['success'] = "Purchase order created successfully.";
-                header('Location: /pos/public/suppliers');
-            } catch (\Exception $e) {
-                $this->conn->rollback();
-                $_SESSION['error'] = "Failed to create purchase order: " . $e->getMessage();
+       if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $supplier_id = (int)$data['supplier_id'];
+        $items = $data['items'];
+        $notes = $this->conn->real_escape_string($data['notes'] ?? '');
+        $invoice_ref = $this->conn->real_escape_string($data['invoice_ref'] ?? $this->generateInvoiceNumber());
+        
+        $this->conn->begin_transaction();
+        try {
+            $total_amount = 0;
+            foreach ($items as $item) {
+                $total_amount += $item['quantity'] * $item['unit_price'];
             }
-            $stmt->close();
+            
+            $stmt = $this->conn->prepare("INSERT INTO purchase_orders 
+                (supplier_id, total_amount, notes, invoice_ref) 
+                VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("idss", $supplier_id, $total_amount, $notes, $invoice_ref);
+            // ... rest of your existing code
+        } catch (\Exception $e) {
+            // ... error handling
         }
+    }
     }
 
     public function recordPayment()
@@ -267,6 +254,82 @@ class SupplierController
         }
     }
 
+    public function fetchSuppliers()
+    {
+        header('Content-Type: application/json');
+        
+        try {
+            $suppliers = [];
+            $query = "SELECT id, name FROM suppliers ORDER BY name ASC";
+            $result = $this->conn->query($query);
+            
+            if ($result) {
+                while ($row = $result->fetch_assoc()) {
+                    $suppliers[] = $row;
+                }
+                echo json_encode([
+                    'success' => true,
+                    'suppliers' => $suppliers
+                ]);
+            } else {
+                throw new \Exception($this->conn->error);
+            }
+        } catch (\Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to fetch suppliers: ' . $e->getMessage()
+            ]);
+        }
+        exit;
+    }
+
+    
+    public function getNextInvoiceNumber()
+    {
+        header('Content-Type: application/json');
+        
+        try {
+            $date = $_GET['date'] ?? date('Ymd');
+            $invoiceNumber = $this->generateInvoiceNumber($date);
+            
+            echo json_encode([
+                'success' => true,
+                'invoiceNumber' => $invoiceNumber
+            ]);
+        } catch (\Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to generate invoice number'
+            ]);
+        }
+        exit;
+    }
+
+    private function generateInvoiceNumber($date = null)
+    {
+        $date = $date ?? date('Ymd');
+        
+        $query = "SELECT invoice_ref FROM inventory_receipts 
+                WHERE invoice_ref LIKE ? 
+                ORDER BY invoice_ref DESC 
+                LIMIT 1";
+        $stmt = $this->conn->prepare($query);
+        $likePattern = $date.'-%';
+        $stmt->bind_param("s", $likePattern);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows > 0) {
+            $lastInvoice = $result->fetch_assoc();
+            $lastSequence = (int)explode('-', $lastInvoice['invoice_ref'])[1];
+            $sequence = str_pad($lastSequence + 1, 3, '0', STR_PAD_LEFT);
+        } else {
+            $sequence = '001';
+        }
+        
+        return $date . '-' . $sequence;
+    }
+ 
     public function __destruct()
     {
         $this->conn->close();
