@@ -3,13 +3,13 @@ if (!defined('BASE_PATH')) {
     define('BASE_PATH', dirname(__DIR__, 3) . '/');
 }
 
-// Check if user is authorized
-if (!isset($_SESSION['user']) || !is_array($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['admin'])) {
+// Check if user is authorized (now allowing both admin and inventory_clerk)
+if (!isset($_SESSION['user']) || !is_array($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['admin', 'inventory_clerk'])) {
     header('Location: /pos/public/login');
     exit;
 }
 
-$admin = $_SESSION['user'] ?? ['name' => 'admin', 'id' => '01'];
+$currentUser = $_SESSION['user'] ?? ['name' => 'User', 'id' => '01', 'role' => 'inventory_clerk'];
 $categories = $categories ?? [];
 $error = $error ?? '';
 ?>
@@ -41,7 +41,7 @@ $error = $error ?? '';
             <div class="header-right">
                 <span class="admin-info" aria-label="Admin information">
                     <i class="fas fa-user-circle" aria-hidden="true"></i>
-                    <?php echo htmlspecialchars($admin['name']) . ' (ID: ' . htmlspecialchars($admin['id']) . ')'; ?>
+                    <?php echo htmlspecialchars($currentUser['name']) . ' (ID: ' . htmlspecialchars($currentUser['id']) . ')'; ?>
                 </span>
                 <div class="header-actions">
                     <button class="btn btn-theme-toggle" onclick="toggleTheme()" title="Toggle Theme" aria-label="Toggle theme">
@@ -107,12 +107,23 @@ $error = $error ?? '';
                             </div>
                         </div>
                         <div class="form-group">
+                            <label for="cost_price" class="form-label">
+                                <i class="fas fa-money-bill-wave" aria-hidden="true"></i> Buying Price (KSh)
+                            </label>
+                            <input type="number" step="0.01" class="form-control" id="cost_price" name="cost_price" 
+                                   value="<?php echo htmlspecialchars($_POST['cost_price'] ?? '0.00'); ?>" 
+                                   required aria-required="true">
+                        </div>
+                        <div class="form-group">
                             <label for="price" class="form-label">
-                                <i class="fas fa-money-bill" aria-hidden="true"></i> Price (KSh)
+                                <i class="fas fa-tag" aria-hidden="true"></i> Selling Price (KSh)
                             </label>
                             <input type="number" step="0.01" class="form-control" id="price" name="price" 
                                    value="<?php echo htmlspecialchars($_POST['price'] ?? '0.00'); ?>" 
-                                   required aria-required="true">
+                                   <?php echo $currentUser['role'] === 'inventory_clerk' ? 'disabled' : ''; ?>>
+                            <?php if ($currentUser['role'] === 'inventory_clerk'): ?>
+                                <small class="form-note">Selling price will be set by admin after approval</small>
+                            <?php endif; ?>
                         </div>
                         <div class="form-group">
                             <label for="stock" class="form-label">
@@ -132,14 +143,15 @@ $error = $error ?? '';
                     </div>
                     <div class="action-row">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-plus" aria-hidden="true"></i> Add Product
+                            <i class="fas fa-plus" aria-hidden="true"></i> 
+                            <?php echo $currentUser['role'] === 'inventory_clerk' ? 'Submit for Approval' : 'Add Product'; ?>
                         </button>
-                        
                     </div>
                 </form>
             </div>
         </div>
     </div>
+
 
     <script>
         function updateTime() {
@@ -193,16 +205,22 @@ $error = $error ?? '';
         // Form validation
         document.getElementById('add-product-form').addEventListener('submit', function(event) {
             const name = document.getElementById('name').value;
-            const price = parseFloat(document.getElementById('price').value);
+            const costPrice = parseFloat(document.getElementById('cost_price').value);
+            const sellingPrice = parseFloat(document.getElementById('price').value);
             const stock = parseInt(document.getElementById('stock').value);
             const categoryId = document.getElementById('category_id').value;
             const newCategory = document.getElementById('new_category').value;
+            const userRole = '<?php echo $currentUser['role']; ?>';
+            
             if (!name.trim()) {
                 event.preventDefault();
                 alert('Product name is required.');
-            } else if (price <= 0) {
+            } else if (costPrice <= 0) {
                 event.preventDefault();
-                alert('Price must be greater than 0.');
+                alert('Buying price must be greater than 0.');
+            } else if (userRole === 'admin' && sellingPrice <= 0) {
+                event.preventDefault();
+                alert('Selling price must be greater than 0.');
             } else if (stock < 0) {
                 event.preventDefault();
                 alert('Stock cannot be negative.');
@@ -412,6 +430,22 @@ $error = $error ?? '';
         }
         .form-control:hover {
             border-color: #93c5fd;
+        }
+        .form-note {
+            display: block;
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        
+        input:disabled {
+            background-color: #f3f4f6;
+            color: #6b7280;
+        }
+        
+        .dark-theme input:disabled {
+            background-color: #4b5563;
+            color: #9ca3af;
         }
         .category-input-group {
             position: relative;

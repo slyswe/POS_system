@@ -489,33 +489,39 @@ $pending_approvals = $pending_approvals ?? [];
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2 class="sidebar-title">Admin Dashboard</h2>
+                <h2 class="sidebar-title">Dashboard</h2>
                 <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
                     <i class="fas fa-bars"></i>
                 </button>
             </div>
             <nav class="sidebar-nav">
-                <a href="/pos/public/dashboard" class="nav-item">
+                <a href="/pos/public/dashboard" class="nav-item active">
                     <i class="fas fa-tachometer-alt"></i> <span>Overview</span>
                 </a>
                 <a href="/pos/public/products" class="nav-item">
                     <i class="fas fa-box"></i> <span>Inventory</span>
                 </a>
-                <a href="/pos/public/sales" class="nav-item active">
+                <a href="/pos/public/sales_repo" class="nav-item">
                     <i class="fas fa-shopping-cart"></i> <span>Sales</span>
                 </a>
                 <?php if (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin'): ?>
                     <a href="/pos/public/users" class="nav-item">
-                        <i class="fas fa-users"></i> <span>Users</span>
+                        <i class="fas fa-users"></i> <span>Staff</span>
                     </a>
                     <a href="/pos/public/suppliers" class="nav-item">
                         <i class="fas fa-truck"></i> <span>Suppliers</span>
+                    </a>
+                    <!-- <a href="" class="nav-item">
+                        <i class="fas fa-user-friends"></i> <span>Customers</span>
+                    </a> -->
+                    <a href="/pos/public/reports/profit_loss" class="nav-item">
+                        <i class="fas fa-file-alt"></i> <span>Reports</span>
                     </a>
                 <?php endif; ?>
             </nav>
             <div class="sidebar-footer">
                 <div class="user-profile">
-                    <span class="user-name"><i class="fas fa-user-circle"></i> <?php echo htmlspecialchars($_SESSION['user']['name'] ?? 'Admin User'); ?> (<?php echo htmlspecialchars($_SESSION['user']['role'] ?? 'admin'); ?>)</span>
+                    <span class="user-name"><i class="fas fa-user-circle"></i> <?php echo htmlspecialchars($user_name); ?> (<?php echo htmlspecialchars($role); ?>)</span>
                     <a href="/pos/public/logout" class="logout-link">
                         <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
                     </a>
@@ -574,7 +580,7 @@ $pending_approvals = $pending_approvals ?? [];
                             <i class="fas fa-dollar-sign stat-icon"></i>
                         </div>
                         <p class="stat-value"><?php echo number_format($kpi_data['total_sales'], 2); ?> KSh</p>
-                        <p class="stat-subtext"><span style="color: #10b981;">+12.5%</span> vs last period</p>
+                        
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">
@@ -783,38 +789,7 @@ $pending_approvals = $pending_approvals ?? [];
                 </table>
             </section>
 
-            <!-- Pending Approvals Section -->
-            <section class="pending-approvals-section">
-                <div class="section-header">
-                    <h3 class="section-title">Pending Approvals</h3>
-                </div>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Request ID</th>
-                            <th>Type</th>
-                            <th>Submitted By</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!empty($pending_approvals)): ?>
-                            <?php foreach ($pending_approvals as $approval): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($approval['id']); ?></td>
-                                    <td><?php echo htmlspecialchars($approval['type']); ?></td>
-                                    <td><?php echo htmlspecialchars($approval['submitted_by']); ?></td>
-                                    <td><?php echo date('Y-m-d H:i:s', strtotime($approval['timestamp'])); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="4">No pending approvals.</td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </section>
+            
         </main>
     </div>
 

@@ -97,12 +97,15 @@ $admin = $_SESSION['user'] ?? ['name' => 'admin', 'id' => '01'];
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="price" class="form-label">
-                                <i class="fas fa-money-bill" aria-hidden="true"></i> Price (KSh)
-                            </label>
+                            <label for="cost_price">Buying Price</label>
+                            <input type="number" step="0.01" class="form-control" id="cost_price" name="cost_price" 
+                                value="<?= htmlspecialchars($product['cost_price'] ?? '0.00') ?>" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="price">Selling Price</label>
                             <input type="number" step="0.01" class="form-control" id="price" name="price" 
-                                   value="<?php echo htmlspecialchars($product['price'] ?? '0.00'); ?>" 
-                                   required aria-required="true">
+                                value="<?= htmlspecialchars($product['price'] ?? '0.00') ?>" required>
                         </div>
                         <div class="form-group">
                             <label for="stock" class="form-label">

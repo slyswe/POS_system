@@ -15,26 +15,34 @@ $clerk = $_SESSION['clerk'] ?? ['name' => 'Clerk1', 'id' => '12345'];
 $suppliers = $suppliers ?? [];
 $batches = $batches ?? [];
 
-// Calculate inventory valuation
-$totalInventoryValue = 0;
-foreach ($products as $product) {
-    $totalInventoryValue += ($product['cost_price'] ?? 0) * $product['stock'];
-}
-
-// Group products by category
+// Initialize data structures
 $grouped_products = [];
 $categories = [];
+$categoryValues = []; // array for individual category values.
+$totalInventoryValue = 0;
+
+// Single-pass processing of products
 foreach ($products as $product) {
     $category = $product['category_name'] ?? 'Uncategorized';
     $category_id = $product['category_id'] ?? md5($category);
+    
+    // Initialize category if not exists
     if (!isset($grouped_products[$category_id])) {
         $grouped_products[$category_id] = [
             'name' => $category,
             'products' => []
         ];
         $categories[$category_id] = $category;
+        $categoryValues[$category_id] = 0; // Initialize category value
     }
+    
+    // Add product to group
     $grouped_products[$category_id]['products'][] = $product;
+    
+    // Calculate and accumulate values
+    $productValue = ($product['cost_price'] ?? 0) * $product['stock'];
+    $categoryValues[$category_id] += $productValue;
+    $totalInventoryValue += $productValue;
 }
 ?>
 
@@ -255,6 +263,22 @@ foreach ($products as $product) {
             width: 100% !important;
             height: auto !important;
         }
+        #inventoryValueChart-container {
+            position: relative;
+            height: 300px;
+            max-height: 50vh;
+            width: 100%;
+        }
+
+        .chart-fallback {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .chart-fallback i {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
         
         /* Dark Theme */
         .dark-theme {
@@ -282,11 +306,72 @@ foreach ($products as $product) {
         .dark-theme .valuation-card {
             background: linear-gradient(135deg, #374151, #4b5563);
         }
+            /* Modal Overlay Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        overflow: auto;
+    }
+    
+    .modal-content {
+        background-color: #fff;
+        margin: 10% auto;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        width: 90%;
+        max-width: 500px;
+    }
+    
+    .modal-close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .modal-close:hover {
+        color: #000;
+    }
+    
+    .modal h2 {
+        margin-top: 0;
+        color: #1e3a8a;
+    }
+    
+    .dark-theme .modal-content {
+        background-color: #374151;
+        color: #d1d5db;
+    }
+    
+    .dark-theme .modal h2 {
+        color: #3b82f6;
+    }
+    
+    .dark-theme .modal-close {
+        color: #9ca3af;
+    }
+    
+    .dark-theme .modal-close:hover {
+        color: #fff;
+    }
         
         /* Responsive Adjustments */
         @media (max-width: 1024px) {
             .main-content {
                 grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 768px) {
+            #inventoryValueChart-container {
+                height: 250px;
             }
         }
     </style>
@@ -329,6 +414,9 @@ foreach ($products as $product) {
                         <button class="btn btn-success" onclick="showReceivingPanel()">
                             <i class="fas fa-truck"></i> Receive Inventory
                         </button>
+                        <a href="/pos/public/products/create" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Add Product
+                        </a>
                     </div>
                 </div>
                 
@@ -362,7 +450,7 @@ foreach ($products as $product) {
                             <tr>
                                 <th>Name</th>
                                 <th>Category</th>
-                                <th class="financial-column">Cost Price</th>
+                                <th class="financial-column">Buying Price</th>
                                 <th>Selling Price</th>
                                 <th>Barcode</th>
                                 <th>Batch</th>
@@ -428,7 +516,7 @@ foreach ($products as $product) {
                     <h3 class="valuation-title">Total Inventory Value</h3>
                     <p class="valuation-amount"><?= number_format($totalInventoryValue, 2) ?> KSh</p>
                 </div>
-                <div>
+                <div id="inventoryValueChart-container">
                     <canvas id="inventoryValueChart"></canvas>
                 </div>
             </div>
@@ -614,6 +702,7 @@ foreach ($products as $product) {
     </div>
 </div>
 
+
 <script>
 // DOM Ready
 document.addEventListener('DOMContentLoaded', function() {
@@ -633,45 +722,123 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Generate initial invoice number
     updateInvoiceNumber();
+
+    console.log("Canvas exists:", !!document.getElementById('inventoryValueChart'));
+    initInventoryChart();
 });
 
 // Initialize Inventory Value Chart
 function initInventoryChart() {
-    const ctx = document.getElementById('inventoryValueChart').getContext('2d');
-    const chart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: <?= json_encode(array_values($categories)) ?>,
-            datasets: [{
-                data: <?= json_encode(array_map(function($cat) use ($products, $categories) {
-                    $cat_id = array_search($cat, $categories);
-                    return array_reduce($products, function($sum, $p) use ($cat_id) {
-                        return $sum + (($p['category_id'] ?? md5('Uncategorized')) == $cat_id ? 
-                               ($p['cost_price'] ?? 0) * ($p['stock'] ?? 0) : 0);
-                    }, 0);
-                }, array_values($categories))) ?>,
-                backgroundColor: [
-                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', 
-                    '#ec4899', '#14b8a6', '#f97316', '#64748b', '#84cc16'
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'right',
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `${context.label}: ${context.raw.toLocaleString()} KSh`;
+    // Get chart canvas element safely
+    const ctx = document.getElementById('inventoryValueChart');
+    if (!ctx) {
+        console.error("Chart container not found");
+        return;
+    }
+
+    try {
+        // Initialize the chart
+        const chart = new Chart(ctx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: <?= json_encode(array_values($categories)) ?>,
+                datasets: [{
+                    data: <?= json_encode(array_values($categoryValues)) ?>,
+                    backgroundColor: [
+                        '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', 
+                        '#ec4899', '#14b8a6', '#f97316', '#64748b', '#84cc16'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 10
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.label}: ${context.raw.toLocaleString()} KSh`;
+                            }
                         }
                     }
+                },
+                layout: {
+                    padding: {
+                        top: 10,
+                        right: 10,
+                        bottom: 10,
+                        left: 10
+                    }
+                },
+                // Added animation configuration
+                animation: {
+                    animateScale: true,
+                    animateRotate: true
                 }
             }
+        });
+        
+        // Store chart reference for updates
+        window.inventoryChart = chart;
+        
+    } catch (e) {
+        console.error("Chart initialization failed:", e);
+        // Create comprehensive fallback display
+        ctx.innerHTML = `
+            <div class="chart-fallback" style="
+                text-align: center;
+                padding: 20px;
+                color: #666;
+                background: #f8f9fa;
+                border-radius: 8px;
+                border: 1px dashed #ddd;
+            ">
+                <i class="fas fa-chart-pie" style="
+                    font-size: 2rem;
+                    margin-bottom: 10px;
+                    color: #6c757d;
+                "></i>
+                <p style="margin: 5px 0; font-weight: 500;">Inventory Valuation Data Unavailable</p>
+                <p style="margin: 5px 0;">Total Value: <strong><?= number_format($totalInventoryValue, 2) ?> KSh</strong></p>
+                <small style="color: #999;">Chart cannot be displayed due to technical error</small>
+            </div>
+        `;
+        
+        // If Font Awesome fails to load
+        if (typeof FontAwesome === 'undefined') {
+            ctx.querySelector('i').style.display = 'none';
         }
-    });
+    }
+}
+
+async function refreshValuation() {
+    try {
+        const response = await fetch('/pos/public/api/inventory/valuation');
+        const data = await response.json();
+        
+        if (!data || !data.categories) throw new Error("Invalid data");
+        
+        // Update total display
+        document.querySelector('.valuation-amount').textContent = 
+            data.total.toLocaleString('en-US', {minimumFractionDigits: 2}) + ' KSh';
+        
+        // Update chart if it exists
+        if (window.inventoryChart) {
+            window.inventoryChart.data.datasets[0].data = Object.values(data.categories);
+            window.inventoryChart.data.labels = Object.keys(data.categories);
+            window.inventoryChart.update();
+        }
+        
+    } catch (error) {
+        console.error("Failed to refresh valuation:", error);
+    }
 }
 
 // Set up event listeners
@@ -945,18 +1112,16 @@ function submitStockAdjustment(e) {
     const adjustmentData = {
         product_id: productId,
         batch_id: batchId,
-        quantity_change: changeType === '+' ? quantity : -quantity,
+        change_type: changeType === '+' ? 'add' : 'remove',
+        change_amount: quantity,
         reason: reason === 'other' ? otherReason : reason,
-        adjusted_by: <?= $clerk['id'] ?>
+        submitted_by: <?= $clerk['id'] ?>,
+        supplier_id: reason === 'restock' ? supplierId : null,
+        unit_cost: reason === 'restock' ? unitCost : null,
+        invoice_ref: reason === 'restock' ? invoiceRef : null
     };
     
-    if (reason === 'restock') {
-        adjustmentData.supplier_id = supplierId;
-        adjustmentData.unit_cost = unitCost;
-        adjustmentData.invoice_ref = invoiceRef;
-    }
-    
-    fetch('/pos/api/inventory/adjust', {
+    fetch('/pos/public/api/inventory/adjustment-request', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -966,15 +1131,15 @@ function submitStockAdjustment(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Stock adjustment recorded successfully');
-            location.reload();
+            alert('Stock adjustment request submitted for approval');
+            closeModal();
         } else {
             alert('Error: ' + data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Failed to submit adjustment');
+        alert('Failed to submit adjustment request');
     });
 }
 
@@ -990,6 +1155,51 @@ function editCostPrice(e, productId) {
     document.getElementById('new-cost').value = currentCost;
     
     document.getElementById('cost-modal').style.display = 'block';
+}
+
+function submitCostUpdate(e) {
+    e.preventDefault();
+    
+    const productId = document.getElementById('cost-product-id').value;
+    const newCost = document.getElementById('new-cost').value;
+    const reason = document.getElementById('cost-change-reason').value;
+    
+    if (!productId || !newCost || !reason) {
+        alert('Please fill all required fields');
+        return;
+    }
+    
+    fetch('/pos/public/api/inventory/cost-change-request', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            product_id: productId,
+            new_cost: newCost,
+            reason: reason,
+            submitted_by: <?= $clerk['id'] ?>
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert('Cost change request submitted for approval');
+            closeCostModal();
+            location.reload(); // Refresh to show pending changes
+        } else {
+            throw new Error(data.message || 'Failed to submit request');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error: ' + error.message);
+    });
 }
 
 function closeCostModal() {
@@ -1050,6 +1260,22 @@ if (localStorage.getItem('theme') === 'dark') {
         icon.classList.replace('fa-moon', 'fa-sun');
     }
 }
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        closeModal();
+        closeCostModal();
+    }
+}
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeModal();
+        closeCostModal();
+    }
+});
 </script>
 </body>
 </html>

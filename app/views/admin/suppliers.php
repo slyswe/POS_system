@@ -15,10 +15,10 @@ $role = htmlspecialchars($_SESSION['user']['role'] ?? 'admin');
 </head>
 <body>
     <div class="dashboard-container">
-        <!-- Sidebar (Copied from Dashboard) -->
+        <!-- Sidebar (from Admin Dashboard) -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2 class="sidebar-title">Admin Dashboard</h2>
+                <h2 class="sidebar-title">Dashboard</h2>
                 <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
                     <i class="fas fa-bars"></i>
                 </button>
@@ -115,12 +115,16 @@ $role = htmlspecialchars($_SESSION['user']['role'] ?? 'admin');
                                         <button class="btn btn-primary" onclick="openSupplierModal('edit', <?php echo json_encode($supplier); ?>)">Edit</button>
                                         <button class="btn btn-primary" onclick="openPurchaseModal(<?php echo $supplier['id']; ?>)">New Purchase</button>
                                         <button class="btn btn-primary" onclick="openPaymentModal(<?php echo $supplier['id']; ?>)">Record Payment</button>
+                                        <button class="btn btn-info" onclick="openInvoiceModal(<?php echo $supplier['id']; ?>)">Add Invoice</button>
+                                        
                                     </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+                
+            </div>
             </section>
 
             <!-- Supplier Modal -->
@@ -145,6 +149,24 @@ $role = htmlspecialchars($_SESSION['user']['role'] ?? 'admin');
                         <div class="form-group">
                             <label for="supplier-category">Category</label>
                             <input type="text" id="supplier-category" name="category">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="supplier-payment-terms">Default Payment Terms</label>
+                            <select id="supplier-payment-terms" name="payment_terms">
+                                <option value="net_15">Net 15</option>
+                                <option value="net_30">Net 30</option>
+                                <option value="net_60">Net 60</option>
+                                <option value="due_on_receipt">Due on Receipt</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="supplier-credit-limit">Credit Limit</label>
+                            <input type="number" id="supplier-credit-limit" name="credit_limit" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label for="supplier-tax-id">Tax ID/VAT Number</label>
+                            <input type="text" id="supplier-tax-id" name="tax_id">
                         </div>
                         <div class="form-footer">
                             <button type="submit" class="btn btn-primary">Save</button>
@@ -179,6 +201,22 @@ $role = htmlspecialchars($_SESSION['user']['role'] ?? 'admin');
                                 </thead>
                                 <tbody></tbody>
                             </table>
+                        </div>
+                        <div class="form-group">
+                            <label for="purchase-invoice-number">Supplier Invoice Number</label>
+                            <input type="text" id="purchase-invoice-number" name="invoice_number">
+                        </div>
+                        <div class="form-group">
+                            <label for="purchase-expected-delivery">Expected Delivery Date</label>
+                            <input type="date" id="purchase-expected-delivery" name="expected_delivery">
+                        </div>
+                        <div class="form-group">
+                            <label for="purchase-shipping">Shipping Fees</label>
+                            <input type="number" id="purchase-shipping" name="shipping_fees" step="0.01" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="purchase-tax">Tax/VAT (%)</label>
+                            <input type="number" id="purchase-tax" name="tax_rate" step="0.01" min="0" max="100" value="0">
                         </div>
                         <div class="form-group">
                             <label for="purchase-notes">Notes</label>
@@ -238,20 +276,145 @@ $role = htmlspecialchars($_SESSION['user']['role'] ?? 'admin');
                     <table class="table" id="history-table">
                         <thead>
                             <tr>
-                                <th>Order ID</th>
-                                <th>Date</th>
-                                <th>Total</th>
-                                <th>Paid</th>
-                                <th>Balance</th>
-                                <th>Status</th>
-                                <th>Delivery</th>
-                                <th>Actions</th>
-                            </tr>
+                            <th>Order ID</th>
+                            <th>Invoice #</th>
+                            <th>Date</th>
+                            <th>Total</th>
+                            <th>Tax</th>
+                            <th>Shipping</th>
+                            <th>Paid</th>
+                            <th>Balance</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
                         </thead>
                         <tbody></tbody>
                     </table>
                     <div class="form-footer">
                         <button type="button" class="btn btn-exit" onclick="closeModal('history-modal')">Exit</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Supplier Invoice Modal -->
+            <div class="modal-overlay" id="invoice-modal">
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal('invoice-modal')">×</span>
+                    <h3>Supplier Invoice</h3>
+                    <form id="invoice-form" enctype="multipart/form-data">
+                        <input type="hidden" name="supplier_id" id="invoice-supplier-id">
+                        <div class="form-group">
+                            <label for="invoice-number">Invoice Number</label>
+                            <input type="text" id="invoice-number" name="invoice_number" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="invoice-date">Invoice Date</label>
+                            <input type="date" id="invoice-date" name="invoice_date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="invoice-amount">Total Amount</label>
+                            <input type="number" id="invoice-amount" name="amount" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="invoice-tax">Tax/VAT Amount</label>
+                            <input type="number" id="invoice-tax" name="tax_amount" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label for="invoice-shipping">Shipping Fees</label>
+                            <input type="number" id="invoice-shipping" name="shipping_fees" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label for="invoice-file">Upload Invoice (PDF/Image)</label>
+                            <input type="file" id="invoice-file" name="invoice_file" accept=".pdf,.jpg,.jpeg,.png">
+                        </div>
+                        <div class="form-group">
+                            <label for="invoice-payment-terms">Payment Terms</label>
+                            <select id="invoice-payment-terms" name="payment_terms">
+                                <option value="net_15">Net 15</option>
+                                <option value="net_30">Net 30</option>
+                                <option value="net_60">Net 60</option>
+                                <option value="due_on_receipt">Due on Receipt</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="invoice-early-discount">Early Payment Discount (%)</label>
+                            <input type="number" id="invoice-early-discount" name="early_discount" step="0.01" min="0" max="100">
+                        </div>
+                        <div class="form-group">
+                            <label for="invoice-notes">Notes</label>
+                            <textarea id="invoice-notes" name="notes"></textarea>
+                        </div>
+                        <div class="form-footer">
+                            <button type="submit" class="btn btn-primary">Save Invoice</button>
+                            <button type="button" class="btn btn-exit" onclick="closeModal('invoice-modal')">Exit</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Financial History Modal -->
+            <div class="modal-overlay" id="financial-modal">
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal('financial-modal')">×</span>
+                    <h3>Financial History</h3>
+                    <div class="financial-tabs">
+                        <button class="tab-btn active" onclick="openFinancialTab('invoices')">Invoices</button>
+                        <button class="tab-btn" onclick="openFinancialTab('payments')">Payments</button>
+                        <button class="tab-btn" onclick="openFinancialTab('balances')">Balance History</button>
+                    </div>
+                    
+                    <!-- Invoices Tab -->
+                    <div id="invoices-tab" class="financial-tab-content">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Invoice #</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Tax</th>
+                                    <th>Status</th>
+                                    <th>Due Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoices-body"></tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Payments Tab -->
+                    <div id="payments-tab" class="financial-tab-content" style="display:none">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Payment ID</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Against Invoice</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payments-body"></tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Balance History Tab -->
+                    <div id="balances-tab" class="financial-tab-content" style="display:none">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Period</th>
+                                    <th>Opening</th>
+                                    <th>Purchases</th>
+                                    <th>Payments</th>
+                                    <th>Closing</th>
+                                </tr>
+                            </thead>
+                            <tbody id="balances-body"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="form-footer">
+                        <button type="button" class="btn btn-exit" onclick="closeModal('financial-modal')">Exit</button>
                     </div>
                 </div>
             </div>
@@ -492,6 +655,136 @@ $role = htmlspecialchars($_SESSION['user']['role'] ?? 'admin');
                 `;
                 tbody.appendChild(row);
             });
+        }
+        function openInvoiceModal(supplierId) {
+            document.getElementById('invoice-supplier-id').value = supplierId;
+            document.getElementById('invoice-modal').style.display = 'flex';
+            document.getElementById('invoice-modal').classList.add('active');
+
+            const form = document.getElementById('invoice-form');
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(form);
+                try {
+                    const response = await axios.post('/pos/public/suppliers/invoice', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                    if (response.data.success) {
+                        showAlert('success', 'Invoice saved successfully.');
+                        closeModal('invoice-modal');
+                        viewPurchaseHistory(supplierId);
+                    } else {
+                        showAlert('error', response.data.message || 'Failed to save invoice.');
+                    }
+                } catch (error) {
+                    showAlert('error', 'Error saving invoice.');
+                }
+            };
+        }
+
+        function viewFinancialHistory(supplierId) {
+    // Reset tabs
+    document.querySelectorAll('.financial-tab-content').forEach(tab => {
+        tab.style.display = 'none';
+    });
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Show default tab
+    document.getElementById('invoices-tab').style.display = 'block';
+    document.querySelector('.financial-tabs button').classList.add('active');
+    
+    // Load data via AJAX
+    axios.get(`/pos/public/suppliers/financials/${supplierId}`)
+        .then(response => {
+            const data = response.data;
+            
+            // Populate invoices
+            const invoicesBody = document.getElementById('invoices-body');
+            invoicesBody.innerHTML = '';
+            data.invoices.forEach(invoice => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${invoice.invoice_number}</td>
+                    <td>${new Date(invoice.date).toLocaleDateString()}</td>
+                    <td>${invoice.amount.toFixed(2)} KSh</td>
+                    <td>${invoice.tax_amount.toFixed(2)} KSh</td>
+                    <td>${invoice.paid ? 'Paid' : 'Pending'}</td>
+                    <td>${new Date(invoice.due_date).toLocaleDateString()}</td>
+                `;
+                invoicesBody.appendChild(row);
+            });
+            
+            // Populate payments
+            const paymentsBody = document.getElementById('payments-body');
+            paymentsBody.innerHTML = '';
+            data.payments.forEach(payment => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${payment.id}</td>
+                    <td>${new Date(payment.date).toLocaleDateString()}</td>
+                    <td>${payment.amount.toFixed(2)} KSh</td>
+                    <td>${payment.method}</td>
+                    <td>${payment.invoice_number || 'N/A'}</td>
+                `;
+                paymentsBody.appendChild(row);
+            });
+            
+            // Populate balance history
+            const balancesBody = document.getElementById('balances-body');
+            balancesBody.innerHTML = '';
+            data.balances.forEach(balance => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${balance.period}</td>
+                    <td>${balance.opening.toFixed(2)} KSh</td>
+                    <td>${balance.purchases.toFixed(2)} KSh</td>
+                    <td>${balance.payments.toFixed(2)} KSh</td>
+                    <td>${balance.closing.toFixed(2)} KSh</td>
+                `;
+                balancesBody.appendChild(row);
+            });
+            
+            // Show modal
+            document.getElementById('financial-modal').style.display = 'flex';
+            document.getElementById('financial-modal').classList.add('active');
+        })
+        .catch(error => {
+            showAlert('error', 'Failed to load financial history');
+        });
+}
+
+        function openFinancialTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.financial-tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(`${tabName}-tab`).style.display = 'block';
+            
+            // Add active class to clicked button
+            event.currentTarget.classList.add('active');
+        }
+
+        function calculatePurchaseTotals() {
+            let subtotal = purchaseItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+            const taxRate = parseFloat(document.getElementById('purchase-tax').value) || 0;
+            const shipping = parseFloat(document.getElementById('purchase-shipping').value) || 0;
+            
+            const taxAmount = subtotal * (taxRate / 100);
+            const total = subtotal + taxAmount + shipping;
+            
+            // Update UI with these values
+            document.getElementById('purchase-subtotal').textContent = subtotal.toFixed(2);
+            document.getElementById('purchase-tax-amount').textContent = taxAmount.toFixed(2);
+            document.getElementById('purchase-total').textContent = total.toFixed(2);
         }
 
         function updateItemQuantity(index, quantity) {
@@ -881,6 +1174,69 @@ $role = htmlspecialchars($_SESSION['user']['role'] ?? 'admin');
         }
         .purchase-items {
             margin-bottom: 20px;
+        }
+        .financial-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .summary-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .summary-card h4 {
+            margin: 0 0 10px 0;
+            font-size: 0.9rem;
+            color: #6b7280;
+        }
+        .summary-card span {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+
+        .financial-tabs {
+    display: flex;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 15px;
+}
+.tab-btn {
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #6b7280;
+    border-bottom: 2px solid transparent;
+}
+.tab-btn.active {
+    color: #1e3a8a;
+    border-bottom-color: #1e3a8a;
+    font-weight: 500;
+}
+.financial-tab-content {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Dark theme adjustments */
+.dark-theme .tab-btn {
+    color: #9ca3af;
+}
+.dark-theme .tab-btn.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+}
+
+        /* For dark theme */
+        .dark-theme .summary-card {
+            background: #374151;
+        }
+        .dark-theme .summary-card span {
+            color: #3b82f6;
         }
         .dark-theme {
             background-color: #1f2937;

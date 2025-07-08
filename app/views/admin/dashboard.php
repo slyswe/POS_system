@@ -406,11 +406,9 @@ $chart_data = $chart_data ?? [];
                     <a href="/pos/public/suppliers" class="nav-item">
                         <i class="fas fa-truck"></i> <span>Suppliers</span>
                     </a>
-                    <a href="" class="nav-item">
-                        <i class="fas fa-user-friends"></i> <span>Customers</span>
-                    </a>
-                    <a href="" class="nav-item">
-                        <i class="fas fa-dollar-sign"></i> <span>Finances</span>
+                    
+                    <a href="/pos/public/profit_loss" class="nav-item">
+                        <i class="fas fa-file-alt"></i> <span>Reports</span>
                     </a>
                 <?php endif; ?>
             </nav>
@@ -470,7 +468,7 @@ $chart_data = $chart_data ?? [];
                         </div>
                         <p class="stat-value"><?php echo number_format($stats['total_sales'], 2); ?> KSh</p>
                         <div class="stat-actions">
-                            <a href="/pos/public/sales" class="btn btn-info">View Sales</a>
+                            <a href="/pos/public/sales_repo" class="btn btn-info">View Sales</a>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -480,7 +478,7 @@ $chart_data = $chart_data ?? [];
                         </div>
                         <p class="stat-value"><?php echo number_format($stats['daily_sales'], 2); ?> KSh (<?php echo $stats['daily_transactions']; ?> transactions)</p>
                         <div class="stat-actions">
-                            <a href="/pos/public/sales?filter=today" class="btn btn-info">View Details</a>
+                            <a href="/pos/public/sales_repo?filter=today" class="btn btn-info">View today's sales</a>
                         </div>
                     </div>
                     <div class="stat-card">

@@ -8,6 +8,7 @@ if (!isset($_SESSION['user']) || !is_array($_SESSION['user']) || $_SESSION['user
 // Initialize variables with proper fallbacks
 $title = $title ?? "Manage Inventory";
 $products = $products ?? [];
+$pendingProducts = $pendingProducts ?? []; // New variable for pending products
 $total = $total ?? count($products); // Assume total is count if not set
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $perPage = $perPage ?? 10;
@@ -27,6 +28,20 @@ foreach ($products as $product) {
         $categories[$category_id] = $category;
     }
     $grouped_products[$category_id]['products'][] = $product;
+}
+
+// Group pending products (if any)
+$pending_grouped = [];
+foreach ($pendingProducts as $product) {
+    $category = $product['category_name'] ?? 'Uncategorized';
+    $category_id = $product['category_id'] ?? md5($category);
+    if (!isset($pending_grouped[$category_id])) {
+        $pending_grouped[$category_id] = [
+            'name' => $category,
+            'products' => []
+        ];
+    }
+    $pending_grouped[$category_id]['products'][] = $product;
 }
 ?>
 
@@ -86,7 +101,22 @@ foreach ($products as $product) {
     <main class="main-content">
         <div class="products-panel">
             <div class="panel-header">
-                <h2 class="panel-title">Product List</h2>
+                <div class="tabs">
+                    <button class="tab active" onclick="showTab('approved-products')">Active Products</button>
+                    <button class="tab" onclick="showTab('pending-adjustments')">
+                        Pending Adjustments
+                        <?php if ($pendingAdjustmentCount > 0): ?>
+                            <span class="badge"><?= $pendingAdjustmentCount ?></span>
+                        <?php endif; ?>
+                    </button>
+                    <button class="tab" onclick="showTab('pending-cost-changes')">
+                        Pending Cost Changes
+                        <?php if ($pendingCostChangeCount > 0): ?>
+                            <span class="badge"><?= $pendingCostChangeCount ?></span>
+                        <?php endif; ?>
+                    </button>
+                   
+                </div>
                 <div class="panel-actions">
                     <a href="/pos/public/products/create" class="btn btn-primary" aria-label="Add new product">
                         <i class="fas fa-plus" aria-hidden="true"></i> Add Product
@@ -138,18 +168,18 @@ foreach ($products as $product) {
                     <table class="products-table" aria-label="Product list">
                         <thead>
                             <tr>
-                                <th class="sortable" onclick="sortTable(0)" 
-                                    aria-sort="none" aria-label="Sort by name">
+                                <th class="sortable" onclick="sortTable(0)" aria-sort="none" aria-label="Sort by name">
                                     Name <i class="fas fa-sort" aria-hidden="true"></i>
                                 </th>
                                 <th aria-label="Category">Category</th>
-                                <th class="sortable" onclick="sortTable(2)" 
-                                    aria-sort="none" aria-label="Sort by price">
-                                    Price <i class="fas fa-sort" aria-hidden="true"></i>
+                                <th class="sortable" onclick="sortTable(2)" aria-sort="none" aria-label="Sort by cost price">
+                                    Buying Price <i class="fas fa-sort" aria-hidden="true"></i>
+                                </th>
+                                <th class="sortable" onclick="sortTable(3)" aria-sort="none" aria-label="Sort by selling price">
+                                    Selling Price <i class="fas fa-sort" aria-hidden="true"></i>
                                 </th>
                                 <th aria-label="Barcode">Barcode</th>
-                                <th class="sortable" onclick="sortTable(4)" 
-                                    aria-sort="none" aria-label="Sort by stock">
+                                <th class="sortable" onclick="sortTable(5)" aria-sort="none" aria-label="Sort by stock">
                                     Stock <i class="fas fa-sort" aria-hidden="true"></i>
                                 </th>
                                 <th aria-label="Actions">Actions</th>
@@ -168,17 +198,32 @@ foreach ($products as $product) {
                                     <td>
                                         <span class="product-name"><?= htmlspecialchars($product['name']) ?></span>
                                         <input type="text" class="inline-edit" data-field="name" 
-                                               data-id="<?= $product['id'] ?>" 
-                                               value="<?= htmlspecialchars($product['name']) ?>" 
-                                               style="display: none;" aria-label="Edit product name">
+                                            data-id="<?= $product['id'] ?>" 
+                                            value="<?= htmlspecialchars($product['name']) ?>" 
+                                            style="display: none;" aria-label="Edit product name">
                                     </td>
                                     <td><?= htmlspecialchars($cat['name']) ?></td>
+                                    <td class="cost-price-cell">
+                                        <span class="product-cost-price"><?= number_format($product['cost_price'], 2) ?> KSh</span>
+                                        <input type="number" step="0.01" class="inline-edit" data-field="cost_price" 
+                                            data-id="<?= $product['id'] ?>" 
+                                            value="<?= htmlspecialchars($product['cost_price']) ?>" 
+                                            style="display: none;" aria-label="Edit cost price">
+                                    </td>
                                     <td class="price-cell">
                                         <span class="product-price"><?= number_format($product['price'], 2) ?> KSh</span>
+                                        <span class="profit-display" style="display: block; font-size: 0.8rem; margin-top: 3px;">
+                                            <?php 
+                                            $profit = $product['price'] - $product['cost_price'];
+                                            $margin = $product['cost_price'] > 0 ? ($profit / $product['cost_price']) * 100 : 0;
+                                            $color = $profit >= 0 ? '#10b981' : '#ef4444';
+                                            ?>
+                                            Margin: <?= number_format($margin, 2) ?>% (<?= number_format($profit, 2) ?> KSh)
+                                        </span>
                                         <input type="number" step="0.01" class="inline-edit" data-field="price" 
-                                               data-id="<?= $product['id'] ?>" 
-                                               value="<?= htmlspecialchars($product['price']) ?>" 
-                                               style="display: none;" aria-label="Edit product price">
+                                            data-id="<?= $product['id'] ?>" 
+                                            value="<?= htmlspecialchars($product['price']) ?>" 
+                                            style="display: none;" aria-label="Edit selling price">
                                     </td>
                                     <td>
                                         <span class="barcode"><?= htmlspecialchars($product['barcode'] ?? 'N/A') ?></span>
@@ -186,9 +231,9 @@ foreach ($products as $product) {
                                     <td class="stock-cell <?= $stock_class ?>">
                                         <span class="product-stock"><?= htmlspecialchars($product['stock']) ?></span>
                                         <input type="number" class="inline-edit" data-field="stock" 
-                                               data-id="<?= $product['id'] ?>" 
-                                               value="<?= htmlspecialchars($product['stock']) ?>" 
-                                               style="display: none;" aria-label="Edit product stock">
+                                            data-id="<?= $product['id'] ?>" 
+                                            value="<?= htmlspecialchars($product['stock']) ?>" 
+                                            style="display: none;" aria-label="Edit product stock">
                                     </td>
                                     <td class="action-buttons">
                                         <button class="btn btn-inline-edit" 
@@ -198,7 +243,7 @@ foreach ($products as $product) {
                                             <i class="fas fa-pencil-alt" aria-hidden="true"></i>
                                         </button>
                                         <a href="/pos/public/products/edit/<?= htmlspecialchars($product['id']) ?>" 
-                                           class="btn btn-edit" aria-label="Edit product details">
+                                        class="btn btn-edit" aria-label="Edit product details">
                                             <i class="fas fa-edit" aria-hidden="true"></i>
                                         </a>
                                         <button class="confirmDelete" onclick="confirmDelete(<?= $product['id'] ?>)" 
@@ -214,6 +259,101 @@ foreach ($products as $product) {
                     </table>
                 <?php endif; ?>
             </div>
+
+              <!-- pending approvals -->                      
+            <div id="pending-adjustments" class="tab-content" style="display: none;">
+                <?php if (empty($pendingAdjustments)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-check-circle"></i>
+                        <h3>No Pending Stock Adjustments</h3>
+                        <p>All adjustments have been reviewed</p>
+                    </div>
+                <?php else: ?>
+                    <table class="products-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Batch</th>
+                                <th>Change</th>
+                                <th>Reason</th>
+                                <th>Submitted By</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($pendingAdjustments as $adj): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($adj['product_name']) ?></td>
+                                <td><?= $adj['batch_id'] ? '#' . $adj['batch_id'] : 'N/A' ?></td>
+                                <td><?= $adj['change_type'] === 'add' ? '+' : '-' ?><?= $adj['change_amount'] ?></td>
+                                <td><?= htmlspecialchars($adj['reason']) ?></td>
+                                <td><?= htmlspecialchars($adj['submitted_by_name']) ?></td>
+                                <td><?= date('m/d/Y', strtotime($adj['submitted_at'])) ?></td>
+                                <td>
+                                    <button class="btn btn-approve" onclick="approveAdjustment(<?= $adj['id'] ?>)">
+                                        <i class="fas fa-check"></i> Approve
+                                    </button>
+                                    <button class="btn btn-reject" onclick="rejectAdjustment(<?= $adj['id'] ?>)">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+
+            <div id="pending-cost-changes" class="tab-content" style="display: none;">
+                <?php if (empty($pendingCostChanges)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-check-circle"></i>
+                        <h3>No Pending Cost Changes</h3>
+                        <p>All cost changes have been reviewed</p>
+                    </div>
+                <?php else: ?>
+                    <table class="products-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Current Cost</th>
+                                <th>New Cost</th>
+                                <th>Reason</th>
+                                <th>Submitted By</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($pendingCostChanges as $change): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($change['product_name']) ?></td>
+                                <td><?= number_format($change['old_cost'], 2) ?> KSh</td>
+                                <td><?= number_format($change['new_cost'], 2) ?> KSh</td>
+                                <td><?= htmlspecialchars($change['reason']) ?></td>
+                                <td><?= htmlspecialchars($change['submitted_by_name']) ?></td>
+                                <td><?= date('m/d/Y', strtotime($change['submitted_at'])) ?></td>
+                                <td>
+                                    <button class="btn btn-approve" onclick="approveCostChange(<?= $change['id'] ?>)">
+                                        <i class="fas fa-check"></i> Approve
+                                    </button>
+                                    <button class="btn btn-reject" onclick="rejectCostChange(<?= $change['id'] ?>)">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+
+            <!-- Existing products table - wrap in tab-content -->
+            <div id="approved-products" class="tab-content">
+                <!-- Your existing products table goes here -->
+            </div>
+
             
             <div class="table-footer">
                 <div class="table-summary">
@@ -387,29 +527,57 @@ function saveInlineEdit(id, field, value, row) {
     fetch('/pos/public/products/inline-update', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
         },
-        body: JSON.stringify({ id, field, value })
+        body: JSON.stringify({ 
+            id: id, 
+            field: field, 
+            value: value 
+        })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
-            row.querySelector(`.product-${field}`).textContent = 
-                field === 'price' ? `${parseFloat(value).toFixed(2)} KSh` : value;
-            showAlert('success', `${field.charAt(0).toUpperCase() + field.slice(1)} updated successfully.`);
-            if (field === 'stock') {
-                const stockCell = row.querySelector('.stock-cell');
-                const stock = parseInt(value);
-                stockCell.classList.remove('low-stock', 'out-of-stock');
-                if (stock <= 0) stockCell.classList.add('out-of-stock');
-                else if (stock < 10) stockCell.classList.add('low-stock');
-                row.dataset.stockLevel = stock <= 0 ? 'out-of-stock' : stock < 10 ? 'low-stock' : '';
+            const displayElement = row.querySelector(`.product-${field.replace('_', '-')}`);
+            if (displayElement) {
+                displayElement.textContent = 
+                    (field === 'price' || field === 'cost_price') 
+                    ? `${parseFloat(value).toFixed(2)} KSh` 
+                    : value;
+            }
+            showAlert('success', `${field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ')} updated successfully.`);
+            
+            if (field === 'price' || field === 'cost_price') {
+                updateProfitDisplay(row);
             }
         } else {
             showAlert('error', data.message || 'Update failed.');
         }
     })
-    .catch(() => showAlert('error', 'Network error.'));
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('error', 'Network error.');
+    });
+}
+
+// Add this function to calculate and display profit
+function updateProfitDisplay(row) {
+    const costPrice = parseFloat(row.querySelector('.product-cost-price').textContent) || 0;
+    const sellingPrice = parseFloat(row.querySelector('.product-price').textContent) || 0;
+    const profit = sellingPrice - costPrice;
+    const margin = costPrice > 0 ? ((profit / costPrice) * 100) : 0;
+    
+    const profitDisplay = row.querySelector('.profit-display');
+    if (profitDisplay) {
+        profitDisplay.textContent = `Margin: ${margin.toFixed(2)}% (${profit.toFixed(2)} KSh)`;
+        profitDisplay.style.color = profit >= 0 ? '#10b981' : '#ef4444';
+    }
 }
 
 // Delete product
@@ -436,6 +604,209 @@ function confirmDelete(id) {
         })
         .catch(() => showAlert('error', 'Network error.'));
     }
+}
+
+function showTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.style.display = 'none';
+    });
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    document.getElementById(tabId).style.display = 'block';
+    event.currentTarget.classList.add('active');
+}
+
+function approveProduct(productId) {
+    const sellingPriceInput = document.querySelector(`.selling-price-input[data-id="${productId}"]`);
+    const sellingPrice = sellingPriceInput ? parseFloat(sellingPriceInput.value) : 0;
+    
+    if (isNaN(sellingPrice)) {
+        alert('Please enter a valid selling price');
+        return;
+    }
+    
+    fetch('/pos/public/products/approve/' + productId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            price: sellingPrice
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', 'Product approved successfully');
+            document.querySelector(`tr[data-id="${productId}"]`).remove();
+            
+            // Update counts
+            const badge = document.querySelector('.tab .badge');
+            if (badge) {
+                const newCount = parseInt(badge.textContent) - 1;
+                badge.textContent = newCount;
+                if (newCount <= 0) {
+                    badge.remove();
+                }
+            }
+        } else {
+            showAlert('error', data.message || 'Approval failed');
+        }
+    })
+    .catch(error => {
+        showAlert('error', 'Network error');
+    });
+}
+
+function approveAdjustment(id) {
+    const notes = prompt('Enter any approval notes (optional):');
+    fetch(`/pos/public/api/inventory/approve-adjustment/${id}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            notes: notes,
+            approved_by: <?= $_SESSION['user']['id'] ?>
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Adjustment approved successfully');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.message || 'Approval failed'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to approve adjustment');
+    });
+}
+
+function rejectAdjustment(id) {
+    const reason = prompt('Enter reason for rejection:');
+    if (!reason) return;
+    
+    fetch(`/pos/public/api/inventory/reject-adjustment/${id}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            reason: reason,
+            approved_by: <?= $_SESSION['user']['id'] ?>
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Adjustment rejected');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.message || 'Rejection failed'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to reject adjustment');
+    });
+}
+
+function rejectProduct(productId) {
+    const reason = prompt('Please enter reason for rejection:');
+    if (reason === null) return;
+    
+    fetch('/pos/public/products/reject/' + productId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            reason: reason
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', 'Product rejected');
+            document.querySelector(`tr[data-id="${productId}"]`).remove();
+            
+            // Update counts
+            const badge = document.querySelector('.tab .badge');
+            if (badge) {
+                const newCount = parseInt(badge.textContent) - 1;
+                badge.textContent = newCount;
+                if (newCount <= 0) {
+                    badge.remove();
+                }
+            }
+        } else {
+            showAlert('error', data.message || 'Rejection failed');
+        }
+    })
+    .catch(error => {
+        showAlert('error', 'Network error');
+    });
+}
+
+function approveCostChange(id) {
+    const notes = prompt('Enter any approval notes (optional):');
+    fetch(`/pos/public/api/inventory/approve-cost-change/${id}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            notes: notes,
+            approved_by: <?= $_SESSION['user']['id'] ?>
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Cost change approved successfully');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to approve cost change');
+    });
+}
+
+function rejectCostChange(id) {
+    const reason = prompt('Enter reason for rejection:');
+    if (!reason) return;
+    
+    fetch(`/pos/public/api/inventory/reject-cost-change/${id}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            reason: reason,
+            approved_by: <?= $_SESSION['user']['id'] ?>
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Cost change rejected');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to reject cost change');
+    });
 }
 
 // Export products
@@ -465,6 +836,11 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     searchProducts();
     filterProducts();
+
+    // Initialized profit displays for all rows
+    document.querySelectorAll('#products-table-body tr').forEach(row => {
+        updateProfitDisplay(row);
+    });
 });
 </script>
 
@@ -712,6 +1088,111 @@ body {
     border-color: #1e3a8a;
     outline: none;
 }
+.cost-price-cell, .price-cell {
+    text-align: right;
+    min-width: 100px;
+}
+
+.profit-display {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.dark-theme .profit-display {
+    color: #9ca3af;
+}
+
+
+.products-table th:nth-child(3),
+.products-table td:nth-child(3),
+.products-table th:nth-child(4),
+.products-table td:nth-child(4) {
+    width: 120px;
+}
+.tabs {
+    display: flex;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 15px;
+}
+
+.tab {
+    padding: 10px 15px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-size: 0.95rem;
+    position: relative;
+    margin-right: 5px;
+}
+
+.tab.active {
+    font-weight: bold;
+    border-bottom: 2px solid #1e3a8a;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.badge {
+    background-color: #ef4444;
+    color: white;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 0.8rem;
+    margin-left: 5px;
+}
+
+.approval-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.btn-approve {
+    background-color: #10b981;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-reject {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.selling-price-input {
+    width: 80px;
+    padding: 5px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+}
+
+.dark-theme .tab {
+    color: #d1d5db;
+}
+
+.dark-theme .tab.active {
+    border-bottom-color: #3b82f6;
+}
+
+.dark-theme .selling-price-input {
+    background-color: #4b5563;
+    border-color: #6b7280;
+    color: #d1d5db;
+}
+
 .action-buttons {
     display: flex;
     gap: 8px;

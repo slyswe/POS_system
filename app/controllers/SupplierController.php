@@ -329,6 +329,9 @@ class SupplierController
         
         return $date . '-' . $sequence;
     }
+
+    // financials history button
+    
  
     public function __destruct()
     {

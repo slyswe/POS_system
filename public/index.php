@@ -89,9 +89,54 @@ switch ($request) {
         $controller = new \App\Controllers\ProductController();
         $controller->export();
         break;
-    case '/pos/public/products/adjust-stock':
+    //case '/pos/public/products/adjust-stock':
+       // $controller = new \App\Controllers\ProductController();
+        //$controller->adjustStock();
+       // break;
+    case '/pos/public/api/inventory/adjustment-request':
         $controller = new \App\Controllers\ProductController();
-        $controller->adjustStock();
+        $controller->submitAdjustmentRequest();
+        break;
+    case '/pos/public/api/inventory/cost-change-request':
+        $controller = new \App\Controllers\ProductController();
+        $controller->submitCostChangeRequest();
+        break;
+    case (preg_match('#^/pos/public/api/inventory/approve-adjustment/(\d+)$#', $request, $matches) ? true : false):
+        $controller = new \App\Controllers\ProductController();
+        $controller->approveAdjustment($matches[1]);
+        break;
+    case (preg_match('#^/pos/public/api/inventory/reject-adjustment/(\d+)$#', $request, $matches) ? true : false):
+        $controller = new \App\Controllers\ProductController();
+        $controller->rejectAdjustment($matches[1]);
+        break;
+        case (preg_match('#^/pos/public/products/approve/(\d+)$#', $request, $matches) ? true : false):
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $id = (int)$matches[1];
+            $controller = new \App\Controllers\ProductController();
+            $controller->approveProduct($id);
+        } else {
+            http_response_code(405); // Method Not Allowed
+            echo "Method not allowed";
+        }
+        break;
+
+    case (preg_match('#^/pos/public/products/reject/(\d+)$#', $request, $matches) ? true : false):
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $id = (int)$matches[1];
+            $controller = new \App\Controllers\ProductController();
+            $controller->rejectProduct($id);
+        } else {
+            http_response_code(405); // Method Not Allowed
+            echo "Method not allowed";
+        }
+        break;
+    case (preg_match('#^/pos/public/api/inventory/approve-cost-change/(\d+)$#', $request, $matches) ? true : false):
+        $controller = new \App\Controllers\ProductController();
+        $controller->approveCostChange($matches[1]);
+        break;
+    case (preg_match('#^/pos/public/api/inventory/reject-cost-change/(\d+)$#', $request, $matches) ? true : false):
+        $controller = new \App\Controllers\ProductController();
+        $controller->rejectCostChange($matches[1]);
         break;
     case '/pos/public/sales/pos':
         $controller = new \App\Controllers\SalesController();
@@ -167,6 +212,18 @@ switch ($request) {
     case '/pos/public/api/suppliers':
         $controller = new \App\Controllers\ProductController();
         $controller->fetchSuppliers();
+        break;
+    case '/pos/public/api/inventory/valuation':
+        $controller = new \App\Controllers\ProductController();
+        $controller->getValuationData();
+        break;
+    case '/pos/public/reports/profit_loss':
+        $controller = new \App\Controllers\ReportsController();
+        $controller->profitLoss();
+        break;
+    case '/pos/public/reports/export-profit-loss':
+        $controller = new \App\Controllers\ReportsController();
+        $controller->exportProfitLoss();
         break;
     default:
         http_response_code(404);
