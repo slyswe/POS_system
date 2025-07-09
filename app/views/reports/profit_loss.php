@@ -1,18 +1,6 @@
 <?php
 $title = "Profit & Loss Report";
 $netProfitClass = $netProfit >= 0 ? 'text-success' : 'text-danger';
-
-$this->view('profit_loss', [
-    'kpi_data' => $kpi_data,
-    'salesData' => [
-        'total_sales' => $kpi_data['total_sales'],
-        'transaction_count' => $kpi_data['transactions'],
-        'discounts' => $kpi_data['discounts'],
-        'refunds' => $kpi_data['refunds'],
-        'refund_count' => $kpi_data['refund_count'],
-        'net_sales' => $kpi_data['total_sales'] - $kpi_data['refunds'],
-    ],
-]);
 ?>
 
 <!DOCTYPE html>
@@ -524,7 +512,9 @@ $this->view('profit_loss', [
                     <a href="/pos/public/suppliers" class="nav-item">
                         <i class="fas fa-truck"></i> <span>Suppliers</span>
                     </a>
-                    
+                    <!-- <a href="" class="nav-item">
+                        <i class="fas fa-user-friends"></i> <span>Customers</span>
+                    </a> -->
                     <a href="/pos/public/reports/profit_loss" class="nav-item">
                         <i class="fas fa-file-alt"></i> <span>Reports</span>
                     </a>
@@ -580,32 +570,36 @@ $this->view('profit_loss', [
                     </button>
                 </div>
             </div>
-
-            <!-- Filters Section -->
+                    <!-- Filters Section -->
             <section class="filters-section">
-                <div class="filters-grid">
-                    <div class="form-group">
-                        <label for="date_range">Date Range:</label>
-                        <select id="date_range" name="range" class="form-select" onchange="updateDateRange()">
-                            <option value="today" <?= $dateRange === 'today' ? 'selected' : '' ?>>Today</option>
-                            <option value="yesterday" <?= $dateRange === 'yesterday' ? 'selected' : '' ?>>Yesterday</option>
-                            <option value="this_week" <?= $dateRange === 'this_week' ? 'selected' : '' ?>>This Week</option>
-                            <option value="last_week" <?= $dateRange === 'last_week' ? 'selected' : '' ?>>Last Week</option>
-                            <option value="this_month" <?= $dateRange === 'this_month' ? 'selected' : '' ?>>This Month</option>
-                            <option value="last_month" <?= $dateRange === 'last_month' ? 'selected' : '' ?>>Last Month</option>
-                            <option value="this_year" <?= $dateRange === 'this_year' ? 'selected' : '' ?>>This Year</option>
-                            <option value="last_year" <?= $dateRange === 'last_year' ? 'selected' : '' ?>>Last Year</option>
-                            <option value="custom" <?= $dateRange === 'custom' ? 'selected' : '' ?>>Custom</option>
-                        </select>
+                <form method="get" action="">
+                    <input type="hidden" name="range" value="<?= htmlspecialchars($dateRange) ?>">
+                    <div class="filters-grid">
+                        <div class="form-group">
+                            <label for="date_range">Date Range:</label>
+                            <select id="date_range" class="form-select" onchange="updateDateRange()">
+                                <option value="today" <?= $dateRange === 'today' ? 'selected' : '' ?>>Today</option>
+                                <option value="yesterday" <?= $dateRange === 'yesterday' ? 'selected' : '' ?>>Yesterday</option>
+                                <option value="this_week" <?= $dateRange === 'this_week' ? 'selected' : '' ?>>This Week</option>
+                                <option value="last_week" <?= $dateRange === 'last_week' ? 'selected' : '' ?>>Last Week</option>
+                                <option value="this_month" <?= $dateRange === 'this_month' ? 'selected' : '' ?>>This Month</option>
+                                <option value="last_month" <?= $dateRange === 'last_month' ? 'selected' : '' ?>>Last Month</option>
+                                <option value="this_year" <?= $dateRange === 'this_year' ? 'selected' : '' ?>>This Year</option>
+                                <option value="last_year" <?= $dateRange === 'last_year' ? 'selected' : '' ?>>Last Year</option>
+                                <option value="custom" <?= $dateRange === 'custom' ? 'selected' : '' ?>>Custom</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="custom-date-range" style="<?= $dateRange === 'custom' ? 'display:block' : 'display:none' ?>">
+                            <label for="start_date">From:</label>
+                            <input type="date" id="start_date" name="start" class="form-input" 
+                                value="<?= htmlspecialchars($startDate) ?>">
+                            <label for="end_date">To:</label>
+                            <input type="date" id="end_date" name="end" class="form-input" 
+                                value="<?= htmlspecialchars($endDate) ?>">
+                        </div>
+                        <button type="submit" class="btn">Apply</button>
                     </div>
-                    <div class="form-group" id="custom-date-range" style="<?= in_array($dateRange, ['today','yesterday','this_week','last_week','this_month','last_month','this_year','last_year']) ? 'display:none' : '' ?>">
-                        <label for="start_date">From:</label>
-                        <input type="date" id="start_date" name="start" class="form-input" value="<?= htmlspecialchars($startDate) ?>">
-                        <label for="end_date">To:</label>
-                        <input type="date" id="end_date" name="end" class="form-input" value="<?= htmlspecialchars($endDate) ?>">
-                    </div>
-                    <button type="submit" class="btn">Apply</button>
-                </div>
+                </form>
             </section>
 
             <!-- Summary Cards Section -->
@@ -613,14 +607,15 @@ $this->view('profit_loss', [
                 <!-- Total Sales Card -->
                 <div class="summary-card">
                     <div class="card-header">
-                        <h3>Total Sales</h3>
-                        <i class="fas fa-shopping-cart"></i>
-                    </div>
-                    <div class="card-value"><?= number_format($salesData['total_sales'], 2) ?> KSh</div>
-                    <div class="card-subtext">
-                        <?= $salesData['transaction_count'] ?> transactions | 
-                        Avg. Sale: <?= number_format($salesData['total_sales'] / max(1, $salesData['transaction_count']), 2) ?> KSh
-                    </div>
+                    <h3>Total Sales</h3>
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <div class="card-value"><?= number_format($salesData['total_sales'], 2) ?> KSh</div>
+                <div class="card-subtext">
+                    <?= $salesData['transaction_count'] ?> transactions total<br>
+                    (<?= $salesData['sale_count'] ?> sales, <?= $salesData['refund_count'] ?> refunds)<br>
+                    <?= number_format($salesData['discounts'], 2) ?> KSh discounts
+                </div>
                 </div>
                 
                 <!-- Net Sales Card -->
@@ -631,7 +626,7 @@ $this->view('profit_loss', [
                     </div>
                     <div class="card-value"><?= number_format($salesData['net_sales'], 2) ?> KSh</div>
                     <div class="card-subtext">
-                        After <?= $salesData['refund_count'] ?> refunds totaling <?= number_format($salesData['refunds'], 2) ?> KSh
+                        After <?= number_format($salesData['refunds'], 2) ?> KSh refunds
                     </div>
                 </div>
                 
@@ -666,7 +661,15 @@ $this->view('profit_loss', [
                         <i class="fas fa-coins"></i>
                     </div>
                     <div class="card-value <?= $netProfitClass ?>">
-                        <?= number_format($netProfit, 2) ?> KSh
+                        <?= number_format($salesData['net_profit'], 2) ?> KSh
+                    </div>
+                    <div class="card-subtext">
+                        <small>
+                            (<?= number_format($salesData['total_sales'], 2) ?> Sales<br>
+                            - <?= number_format($salesData['cost_of_goods_sold'], 2) ?> COGS<br>
+                            - <?= number_format($salesData['refunds'], 2) ?> Refunds<br>
+                            - <?= number_format($salesData['other_expenses'], 2) ?> Op. Expenses)
+                        </small>
                     </div>
                 </div>
             </section>
@@ -675,7 +678,9 @@ $this->view('profit_loss', [
             <section class="report-charts-section">
                 <div class="chart-container">
                     <h3>Sales by Category</h3>
-                    <div class="chart" id="sales-by-category-chart"></div>
+                    <div class="chart">
+                        <canvas id="sales-by-category-chart" height="250"></canvas>
+                    </div>
                     <table class="report-table">
                         <thead>
                             <tr>
@@ -695,7 +700,9 @@ $this->view('profit_loss', [
                 </div>
                 <div class="chart-container">
                     <h3>Expenses by Category</h3>
-                    <div class="chart" id="expenses-by-category-chart"></div>
+                    <div class="chart">
+                        <canvas id="expenses-by-category-chart" height="250"></canvas>
+                    </div>
                     <table class="report-table">
                         <thead>
                             <tr>
@@ -766,77 +773,93 @@ $this->view('profit_loss', [
 
         // Initialize charts
         document.addEventListener('DOMContentLoaded', function() {
-            // Sales by Category Chart
-            const salesCtx = document.getElementById('sales-by-category-chart').getContext('2d');
-            new Chart(salesCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: <?= json_encode(array_column($salesData['by_category'], 'category')) ?>,
-                    datasets: [{
-                        data: <?= json_encode(array_column($salesData['by_category'], 'total')) ?>,
-                        backgroundColor: [
-                            '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-                            '#ec4899', '#14b8a6', '#f97316', '#64748b', '#a855f7'
-                        ]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right',
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.label + ': ' + context.raw.toLocaleString('en-US', {
-                                        style: 'currency',
-                                        currency: 'KES'
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            });
+                // Verify data is available
+                console.log('Sales by category data:', <?= json_encode($salesData['by_category']) ?>);
+                console.log('Expenses by category data:', <?= json_encode($expensesData['by_category']) ?>);
 
-            // Expenses by Category Chart
-            const expensesCtx = document.getElementById('expenses-by-category-chart').getContext('2d');
-            new Chart(expensesCtx, {
-                type: 'bar',
-                data: {
-                    labels: <?= json_encode(array_column($expensesData['by_category'], 'category')) ?>,
-                    datasets: [{
-                        label: 'Expenses',
-                        data: <?= json_encode(array_column($expensesData['by_category'], 'total')) ?>,
-                        backgroundColor: '#ef4444'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return 'KSh ' + value.toLocaleString('en-US');
+                // Sales by Category Chart
+                const salesCtx = document.getElementById('sales-by-category-chart').getContext('2d');
+                if (salesCtx) {
+                    new Chart(salesCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: <?= json_encode(array_column($salesData['by_category'], 'category')) ?>,
+                            datasets: [{
+                                data: <?= json_encode(array_column($salesData['by_category'], 'total')) ?>,
+                                backgroundColor: [
+                                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                                    '#ec4899', '#14b8a6', '#f97316', '#64748b', '#a855f7'
+                                ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'right',
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.label + ': KSh ' + context.raw.toLocaleString('en-US');
+                                        }
+                                    }
                                 }
                             }
                         }
-                    },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return 'KSh ' + context.raw.toLocaleString('en-US');
-                                }
-                            }
-                        }
-                    }
+                    });
+                } else {
+                    console.error('Sales chart canvas not found');
                 }
-            });
+
+                // Expenses by Category Chart
+                const expensesCtx = document.getElementById('expenses-by-category-chart').getContext('2d');
+                if (expensesCtx) {
+                    new Chart(expensesCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: <?= json_encode(array_column($expensesData['by_category'], 'category')) ?>,
+                            datasets: [{
+                                label: 'Expenses (KSh)',
+                                data: <?= json_encode(array_column($expensesData['by_category'], 'total')) ?>,
+                                backgroundColor: '#ef4444',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return 'KSh ' + value.toLocaleString('en-US');
+                                        }
+                                    }
+                                }
+                            },
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return 'KSh ' + context.raw.toLocaleString('en-US');
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    console.error('Expenses chart canvas not found');
+                }
+
+            // Set the select dropdown to match current range
+            document.getElementById('date_range').value = '<?= $dateRange ?>';
+
+            updateDateRange();
         });
     </script>
 </body>

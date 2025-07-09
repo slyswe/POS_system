@@ -1201,7 +1201,6 @@ function submitCostUpdate(e) {
         alert('Error: ' + error.message);
     });
 }
-
 function closeCostModal() {
     document.getElementById('cost-modal').style.display = 'none';
     document.getElementById('cost-form').reset();

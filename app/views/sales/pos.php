@@ -9,6 +9,12 @@ if (!isset($_SESSION['user']) || !is_array($_SESSION['user']) || $_SESSION['user
     exit;
 }
 
+
+if (isset($_SESSION['receipt_data'])) {
+    // Output receipt data for JavaScript
+    echo '<script>const initialReceiptData = ' . json_encode($_SESSION['receipt_data']) . ';</script>';
+}
+
 $title = "Point of Sale";
 $cashier = [
     'name' => $_SESSION['user']['name'] ?? 'Unknown',
@@ -61,7 +67,7 @@ $categories = $categories ?? [
         <!-- Header Section -->
         <header class="bg-white rounded-2xl shadow-lg p-6 mb-6 flex justify-between items-center">
             <div class="flex items-center gap-4">
-                <h1 class="text-3xl font-bold text-blue-600">POS sale terminal</h1>
+                <h1 class="text-3xl font-bold text-blue-600">Point of Sale</h1>
                 <span class="px-3 py-1 text-sm font-medium bg-blue-100 text-blue-600 rounded-full" id="connectivity-status">Online</span>
             </div>
             <div class="flex items-center gap-4">
@@ -141,7 +147,7 @@ $categories = $categories ?? [
                 <!-- Product List -->
                 <div class="p-5">
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4" id="product-list">
-                        <div class="text-center p-4 text-slate-500">Loading products...</div>
+                        <!-- <div class="text-center p-4 text-slate-500">Loading products...</div> -->
                     </div>
                 </div>
                 <!-- Cart Items -->
@@ -268,6 +274,7 @@ $categories = $categories ?? [
         </div>
 
         <!-- Checkout Modal -->
+        
         <div id="checkout-modal" class="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-40 transition-opacity duration-300 hidden">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 transform transition-all duration-300 animate-scale-in">
                 <div class="p-6 border-b border-slate-200">
@@ -278,21 +285,138 @@ $categories = $categories ?? [
                         <p class="text-slate-500 text-lg">Total Amount Due</p>
                         <p class="text-5xl font-bold text-blue-600 tracking-tight" id="modal-total">KSh <?php echo number_format(($subtotal ?? 0) * 1.16, 2); ?></p>
                     </div>
-                    <div id="checkout-summary" class="space-y-2"></div>
+                    
+                    <!-- Checkout Summary -->
+                    <div id="checkout-summary" class="space-y-4">
+                        <div class="border-b border-slate-200 pb-4">
+                            <h4 class="font-medium text-slate-700 mb-3">Items in Cart</h4>
+                            <div class="space-y-3">
+                                <?php foreach ($_SESSION['cart'] ?? [] as $product_id => $item): ?>
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <span class="font-medium"><?php echo htmlspecialchars($item['name']); ?></span>
+                                            <span class="text-sm text-slate-500 block"><?php echo $item['quantity']; ?> × KSh <?php echo number_format($item['price'], 2); ?></span>
+                                        </div>
+                                        <span class="font-medium">KSh <?php echo number_format($item['price'] * $item['quantity'], 2); ?></span>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-slate-600">Subtotal</span>
+                                <span class="font-medium" id="modal-subtotal">KSh <?php echo number_format($subtotal ?? 0, 2); ?></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-600">Tax (16%)</span>
+                                <span class="font-medium" id="modal-tax">KSh <?php echo number_format(($subtotal ?? 0) * 0.16, 2); ?></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-600">Discount</span>
+                                <span class="font-medium text-red-600" id="modal-discount-amount">-KSh 0.00</span>
+                            </div>
+                            <div class="flex justify-between pt-2 border-t border-slate-200">
+                                <span class="text-lg font-bold">Total</span>
+                                <span class="text-lg font-bold" id="modal-grand-total">KSh <?php echo number_format(($subtotal ?? 0) * 1.16, 2); ?></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Inputs -->
                     <div class="payment-section space-y-4">
                         <div>
-                            <label for="modal-amount-paid" class="block text-sm font-medium text-slate-700">Amount Paid (KSh)</label>
+                            <label for="modal-amount-paid" class="block text-sm font-medium text-slate-700 mb-1">Amount Paid (KSh)</label>
                             <input type="number" step="0.01" id="modal-amount-paid" class="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
                         </div>
                         <div>
-                            <label for="modal-discount" class="block text-sm font-medium text-slate-700">Cart Discount (KSh)</label>
+                            <label for="modal-discount" class="block text-sm font-medium text-slate-700 mb-1">Cart Discount (KSh)</label>
                             <input type="number" step="0.01" id="modal-discount" value="0" class="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="updateModalTotal()">
+                        </div>
+                        <div>
+                            <label for="modal-change" class="block text-sm font-medium text-slate-700 mb-1">Change Due (KSh)</label>
+                            <input type="number" step="0.01" id="modal-change" class="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" readonly>
                         </div>
                     </div>
                 </div>
                 <div class="p-6 bg-slate-50 rounded-b-2xl flex items-center justify-between">
-                    <button onclick="closeCheckoutModal()" class="px-6 py-3 text-sm font-semibold text-slate-700 bg-transparent hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
-                    <button onclick="confirmCheckout()" class="px-8 py-3 text-base font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow-md focus:ring-2 focus:ring-green-500 transition">Confirm Payment</button>
+                    <button onclick="closeCheckoutModal()" class="px-6 py-3 text-sm font-semibold text-slate-700 bg-transparent hover:bg-slate-200 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button onclick="return confirmCheckout(event)" class="px-8 py-3 text-base font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow-md focus:ring-2 focus:ring-green-500 transition">
+                        Confirm & Print Receipt
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Receipt Template (hidden until needed) -->
+        <div id="receipt-template" class="hidden">
+            <div class="receipt">
+                <h3 class="text-center font-bold text-lg mb-2"><?php echo htmlspecialchars($title); ?></h3>
+                <p class="text-center text-sm mb-4"><?php echo date('Y-m-d H:i:s'); ?></p>
+                
+                <div class="receipt-header border-b border-black pb-2 mb-2">
+                    <p class="flex justify-between text-sm">
+                        <span>Sale ID:</span>
+                        <span id="receipt-sale-id">SALE-<?php echo rand(1000, 9999); ?></span>
+                    </p>
+                    <p class="flex justify-between text-sm">
+                        <span>Cashier:</span>
+                        <span><?php echo htmlspecialchars($cashier['name']); ?></span>
+                    </p>
+                    <p class="flex justify-between text-sm">
+                        <span>Date:</span>
+                        <span id="receipt-date"><?php echo date('Y-m-d H:i:s'); ?></span>
+                    </p>
+                </div>
+                
+                <div class="receipt-items my-4">
+                    <?php foreach ($_SESSION['cart'] ?? [] as $product_id => $item): ?>
+                        <div class="receipt-item flex justify-between py-1">
+                            <div>
+                                <span class="font-medium"><?php echo htmlspecialchars($item['name']); ?></span>
+                                <span class="text-xs block"><?php echo $item['quantity']; ?> × <?php echo number_format($item['price'], 2); ?></span>
+                            </div>
+                            <span><?php echo number_format($item['price'] * $item['quantity'], 2); ?></span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                
+                <div class="receipt-totals border-t border-black pt-2">
+                    <p class="flex justify-between">
+                        <span>Subtotal:</span>
+                        <span id="receipt-subtotal"><?php echo number_format($subtotal ?? 0, 2); ?></span>
+                    </p>
+                    <p class="flex justify-between">
+                        <span>Tax (16%):</span>
+                        <span id="receipt-tax"><?php echo number_format(($subtotal ?? 0) * 0.16, 2); ?></span>
+                    </p>
+                    <p class="flex justify-between">
+                        <span>Discount:</span>
+                        <span id="receipt-discount">0.00</span>
+                    </p>
+                    <p class="flex justify-between font-bold mt-2">
+                        <span>Total:</span>
+                        <span id="receipt-total"><?php echo number_format(($subtotal ?? 0) * 1.16, 2); ?></span>
+                    </p>
+                    <p class="flex justify-between text-sm mt-4">
+                        <span>Payment Method:</span>
+                        <span id="receipt-payment">Cash</span>
+                    </p>
+                    <p class="flex justify-between text-sm">
+                        <span>Amount Paid:</span>
+                        <span id="receipt-amount-paid"><?php echo number_format(($subtotal ?? 0) * 1.16, 2); ?></span>
+                    </p>
+                    <p class="flex justify-between text-sm">
+                        <span>Change:</span>
+                        <span id="receipt-change">0.00</span>
+                    </p>
+                </div>
+                
+                <div class="receipt-footer text-center text-xs mt-6">
+                    <p>Thank you for shopping with us!</p>
+                    <p>Items can be exchanged within 7 days with receipt</p>
                 </div>
             </div>
         </div>
@@ -1018,6 +1142,33 @@ $categories = $categories ?? [
             }
         }
 
+        // Update the modal total when discount changes
+function updateModalTotal() {
+    const subtotal = <?php echo $subtotal ?? 0; ?>;
+    const tax = subtotal * 0.16;
+    const discount = parseFloat(document.getElementById('modal-discount').value) || 0;
+    const total = subtotal + tax - discount;
+    const amountPaid = parseFloat(document.getElementById('modal-amount-paid').value) || 0;
+    const change = Math.max(0, amountPaid - total);
+    
+    document.getElementById('modal-subtotal').textContent = subtotal.toFixed(2);
+    document.getElementById('modal-tax').textContent = tax.toFixed(2);
+    document.getElementById('modal-discount-amount').textContent = `-${discount.toFixed(2)}`;
+    document.getElementById('modal-grand-total').textContent = total.toFixed(2);
+    document.getElementById('modal-change').value = change.toFixed(2);
+}
+// Update the main payment form when modal inputs change
+document.getElementById('modal-amount-paid').addEventListener('input', function() {
+    document.getElementById('amount_paid').value = this.value;
+    updateModalTotal();
+});
+
+document.getElementById('modal-discount').addEventListener('input', function() {
+    document.getElementById('discount').value = this.value;
+    updateModalTotal();
+});
+
+
         // Checkout modal functions
         function openCheckoutModal() {
             const summaryHTML = generateCheckoutSummary();
@@ -1053,27 +1204,69 @@ $categories = $categories ?? [
             document.removeEventListener('focus', trapFocus, true);
         }
 
-        function confirmCheckout() {
-            if (validatePayment()) {
-                const originalForm = document.getElementById('payment-form');
-                const modalInputs = document.querySelectorAll('.payment-section input');
-                modalInputs.forEach(input => {
-                    const originalInput = originalForm.querySelector(`[name="${input.name}"]`);
-                    if (originalInput) {
-                        originalInput.value = input.value;
-                    }
-                });
-                // Add user_id to the form
-                const userId = '<?php echo htmlspecialchars($cashier['id']); ?>';
-                const userIdInput = document.createElement('input');
-                userIdInput.type = 'hidden';
-                userIdInput.name = 'user_id';
-                userIdInput.value = userId;
-                originalForm.appendChild(userIdInput);
-                generateReceipt();
-                originalForm.submit();
-            }
+       function confirmCheckout(event) {
+    event.preventDefault();
+    
+    // Get values from modal
+    const amountPaid = parseFloat(document.getElementById('modal-amount-paid').value) || 0;
+    const discount = parseFloat(document.getElementById('modal-discount').value) || 0;
+    const total = parseFloat(document.getElementById('modal-grand-total').textContent.replace('KSh ', ''));
+
+    // Validation
+    if (!amountPaid) {
+        showAlert('error', 'Please enter amount paid');
+        return false;
+    }
+    
+    if (amountPaid < total) {
+        showAlert('error', 'Amount paid must cover the total');
+        return false;
+    }
+
+    // Update main form values
+    document.getElementById('amount_paid').value = amountPaid;
+    document.getElementById('discount').value = discount;
+    
+    // Disable the confirm button to prevent multiple submissions
+    const confirmButton = event.target;
+    confirmButton.disabled = true;
+
+    // Submit the form via AJAX
+    const form = document.getElementById('payment-form');
+    const formData = new FormData(form);
+    
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
         }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Generate receipt with the returned data
+            generateReceipt(data.receipt_data);
+            // Redirect after a delay to allow receipt printing
+            setTimeout(() => {
+                window.location.href = '/pos/public/sales/pos';
+            }, 1500);
+        } else {
+            showAlert('error', data.message || 'Failed to process sale');
+            confirmButton.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Checkout failed:', error);
+        showAlert('error', 'Failed to process sale: Network error');
+        confirmButton.disabled = false;
+    });
+
+    // Close the modal
+    closeCheckoutModal();
+}
+
 
         function validatePayment() {
             const amountPaid = parseFloat(document.getElementById('amount_paid').value) || 0;
@@ -1109,92 +1302,124 @@ $categories = $categories ?? [
             return html;
         }
 
-        function generateReceipt() {
-            const cart = <?php echo json_encode($_SESSION['cart'] ?? []); ?>;
-            const subtotal = <?php echo $subtotal ?? 0; ?>;
-            const tax = subtotal * 0.16;
-            const discount = parseFloat(document.getElementById('discount').value) || 0;
-            const total = subtotal + tax - discount;
-            const paymentMethod = document.getElementById('payment_method').value;
-            const saleId = 'SALE-' + Math.floor(Math.random() * 1000);
-            const date = new Date().toLocaleString('en-US', {
-                year: 'numeric',
-                month: 'numeric',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-
-            const receiptTemplate = document.getElementById('receipt-template').cloneNode(true);
-            receiptTemplate.style.display = 'block';
-            receiptTemplate.querySelector('#receipt-sale-id').textContent = saleId;
-            receiptTemplate.querySelector('#receipt-date').textContent = date;
-            receiptTemplate.querySelector('#receipt-subtotal').textContent = subtotal.toFixed(2);
-            receiptTemplate.querySelector('#receipt-tax').textContent = tax.toFixed(2);
-            receiptTemplate.querySelector('#receipt-discount').textContent = discount.toFixed(2);
-            receiptTemplate.querySelector('#receipt-total').textContent = total.toFixed(2);
-            receiptTemplate.querySelector('#receipt-payment').textContent = paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1);
-
-            const itemsContainer = receiptTemplate.querySelector('.receipt-items');
-            itemsContainer.innerHTML = '';
-            for (const [id, item] of Object.entries(cart)) {
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'receipt-item';
-                itemDiv.innerHTML = `
-                    <span>${item.quantity}x ${item.name}</span>
-                    <span>${(item.price * item.quantity).toFixed(2)} KES</span>
-                `;
-                itemsContainer.appendChild(itemDiv);
-            }
-
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>Receipt</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; margin: 20px; }
-                            .receipt { max-width: 300px; margin: 0 auto; font-size: 14px; }
-                            .receipt h3 { text-align: center; margin-bottom: 20px; }
-                            .receipt p { margin: 5px 0; display: flex; justify-content: space-between; }
-                            .receipt-items { margin: 15px 0; }
-                            .receipt-item { display: flex; justify-content: space-between; margin: 5px 0; }
-                            .receipt-totals { border-top: 1px solid #000; padding-top: 10px; margin-top: 10px; }
-                            .receipt-footer { text-align: center; margin-top: 20px; font-style: italic; }
-                            @media print {
-                                body { margin: 0; }
-                                .receipt { max-width: 100%; }
-                            }
-                        </style>
-                    </head>
-                    <body onload="window.print(); window.close();">
-                        ${receiptTemplate.outerHTML}
-                    </body>
-                </html>
-            `);
-            printWindow.document.close();
+        // Enhanced receipt generation
+function generateReceipt(receiptData) {
+    try {
+        if (!receiptData || !receiptData.cart || Object.keys(receiptData.cart).length === 0) {
+            throw new Error('No receipt data available. Cart is empty or sale was not processed.');
         }
 
-        function trapFocus(e) {
-            if (!document.getElementById('checkout-modal').contains(e.target)) {
-                e.stopPropagation();
-                document.getElementById('checkout-modal').focus();
-            }
-        }
+        const subtotal = receiptData.subtotal;
+        const tax = receiptData.tax;
+        const discount = receiptData.discount;
+        const total = receiptData.total;
+        const amountPaid = receiptData.amount_paid;
+        const change = Math.max(0, amountPaid - total);
+        const paymentMethod = receiptData.payment_method;
+        const cashierName = receiptData.cashier_name;
+        const saleId = receiptData.sale_id;
+        const timestamp = receiptData.timestamp;
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            updateTotal();
-            filterProducts('all');
-            document.getElementById('product-search').focus();
-            document.getElementById('product-search').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    e.target.closest('form').submit();
-                }
-            });
-        });
+        // Create a new window for printing
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            throw new Error('Popup blocked. Please allow popups for this site.');
+        }
+        
+        // Build receipt HTML
+        const receiptHTML = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Receipt</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+                    .receipt { width: 80mm; margin: 0 auto; }
+                    .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    .bold { font-weight: bold; }
+                    .mt-1 { margin-top: 0.25rem; }
+                    .mt-2 { margin-top: 0.5rem; }
+                    .mt-4 { margin-top: 1rem; }
+                    .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+                    .border-bottom { border-bottom: 1px dashed #000; }
+                    .border-top { border-top: 1px dashed #000; }
+                    table { width: 100%; border-collapse: collapse; }
+                    td { padding: 2px 0; }
+                    td:last-child { text-align: right; }
+                </style>
+            </head>
+            <body onload="window.print();window.close();">
+                <div class="receipt">
+                    <h2 class="text-center bold">Point of Sale</h2>
+                    <p class="text-center mt-1">${timestamp}</p>
+                    
+                    <div class="border-bottom py-1 mt-2">
+                        <p>Sale ID: ${saleId}</p>
+                        <p>Cashier: ${cashierName}</p>
+                        <p>Payment: ${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
+                    </div>
+                    
+                    <table class="mt-2">
+                        ${Object.entries(receiptData.cart).map(([id, item]) => `
+                            <tr>
+                                <td>${item.name} x ${item.quantity}</td>
+                                <td>${(item.price * item.quantity).toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                    
+                    <div class="border-top mt-2">
+                        <table>
+                            <tr><td>Subtotal:</td><td>${subtotal.toFixed(2)}</td></tr>
+                            <tr><td>Tax (16%):</td><td>${tax.toFixed(2)}</td></tr>
+                            <tr><td>Discount:</td><td>-${discount.toFixed(2)}</td></tr>
+                            <tr class="bold"><td>Total:</td><td>${total.toFixed(2)}</td></tr>
+                            <tr><td>Amount Paid:</td><td>${amountPaid.toFixed(2)}</td></tr>
+                            <tr><td>Change:</td><td>${change.toFixed(2)}</td></tr>
+                        </table>
+                    </div>
+                    
+                    <p class="text-center mt-4">Thank you for shopping with us!</p>
+                </div>
+            </body>
+            </html>
+        `;
+        
+        printWindow.document.open();
+        printWindow.document.write(receiptHTML);
+        printWindow.document.close();
+        
+        showAlert('success', 'Receipt generated successfully.');
+    } catch (error) {
+        console.error('Error generating receipt:', error);
+        showAlert('error', `Failed to generate receipt: ${error.message}`);
+    }
+}
+// Move trapFocus outside of generateReceipt
+function trapFocus(e) {
+    if (!document.getElementById('checkout-modal').contains(e.target)) {
+        e.stopPropagation();
+        document.getElementById('checkout-modal').focus();
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    updateTotal();
+    filterProducts('all');
+    document.getElementById('product-search').focus();
+    document.getElementById('product-search').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.target.closest('form').submit();
+        }
+    });
+
+    if (typeof initialReceiptData !== 'undefined' && initialReceiptData && Object.keys(initialReceiptData.cart).length > 0) {
+        generateReceipt();
+    }
+});
     </script>
 </body>
 </html>

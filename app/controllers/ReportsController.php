@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Controllers;
 
 use App\Models\SalesModel;
@@ -7,6 +8,7 @@ class ReportsController
 {
     private $db;
     private $salesModel;
+    
 
     public function __construct()
     {
@@ -33,70 +35,124 @@ class ReportsController
     }
 
     public function profitLoss()
-{
-    $dateRange = $_GET['range'] ?? 'this_month';
-    $startDate = $_GET['start'] ?? '';
-    $endDate = $_GET['end'] ?? '';
-    
-    list($startDate, $endDate) = $this->calculateDateRange($dateRange, $startDate, $endDate);
-    
-    // Get all financial data
-    $salesData = $this->salesModel->getSalesSummary($startDate, $endDate);
-    
-    // Get additional report data
-    $salesData['by_category'] = $this->salesModel->getSalesByCategory($startDate, $endDate);
-    $salesData['top_products'] = $this->salesModel->getTopSellingProducts($startDate, $endDate);
-    
-    // Prepare view data
-    $viewData = [
-        'title' => 'Profit & Loss Report',
-        'dateRange' => $dateRange,
-        'startDate' => $startDate,
-        'endDate' => $endDate,
-        'salesData' => $salesData,
-        'expensesData' => $this->getExpensesData($startDate, $endDate),
-        'netProfit' => $salesData['net_profit'],
-        'netProfitClass' => $salesData['net_profit'] >= 0 ? 'text-success' : 'text-danger',
-        'user' => $_SESSION['user']
-    ];
-    
-    include BASE_PATH . 'app/views/reports/profit_loss.php';
-}
+
+    {
+         // Use default "all time" range if no parameters
+        if (empty($_GET)) {
+            $firstSale = $this->salesModel->getFirstSaleDate();
+            $lastSale = $this->salesModel->getLastSaleDate();
+            
+            $_GET['range'] = 'custom';
+            $_GET['start'] = $firstSale ?: date('Y-m-01');
+            $_GET['end'] = $lastSale ?: date('Y-m-d');
+        }
+
+        $dateRange = $_GET['range'] ?? 'this_month';
+        $startDate = $_GET['start'] ?? '';
+        $endDate = $_GET['end'] ?? '';
+        
+        list($startDate, $endDate) = $this->calculateDateRange($dateRange, $startDate, $endDate);
+
+        // DEBUG: Output the dates being used
+        //error_log("Using date range: $startDate to $endDate");
+        
+        // Get all data through the SalesModel
+        $salesData = $this->salesModel->getSalesSummary($startDate, $endDate);
+        
+        // Get additional data
+        $salesData['by_category'] = $this->salesModel->getSalesByCategory($startDate, $endDate);
+        $salesData['by_payment'] = $this->salesModel->getSalesByPaymentMethod($startDate, $endDate);
+        $salesData['top_products'] = $this->salesModel->getTopSellingProducts($startDate, $endDate);
+        
+        // Get expenses data
+        $expensesData = $this->getExpensesData($startDate, $endDate);
+        
+        // Prepare view data - ensure ALL fields are included
+        $data = [
+            'title' => 'Profit & Loss Report',
+            'dateRange' => $dateRange,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'salesData' => $salesData, // Contains all the counts
+            'expensesData' => $expensesData,
+            'netProfit' => $salesData['net_profit'],
+            'netProfitClass' => $salesData['net_profit'] >= 0 ? 'text-success' : 'text-danger',
+            'user_name' => $_SESSION['user']['name'] ?? '',
+            'role' => $_SESSION['user']['role'] ?? ''
+        ];
+        
+        include BASE_PATH . 'app/views/reports/profit_loss.php';
+    }
+
     private function calculateDateRange($range, $customStart, $customEnd)
     {
-        if ($customStart && $customEnd) {
+        // Debug input
+        error_log("Calculating range: $range, Custom Start: $customStart, Custom End: $customEnd");
+        
+        if (!empty($customStart) && !empty($customEnd)) {
+            // Debug custom dates
+            error_log("Using custom dates: $customStart to $customEnd");
             return [$customStart, $customEnd];
         }
 
         $today = date('Y-m-d');
+        $result = [$today, $today]; // Default to today
         
         switch ($range) {
             case 'today':
-                return [$today, $today];
+                error_log("Date range: Today ($today)");
+                break;
+                
             case 'yesterday':
                 $yesterday = date('Y-m-d', strtotime('-1 day'));
-                return [$yesterday, $yesterday];
+                $result = [$yesterday, $yesterday];
+                error_log("Date range: Yesterday ($yesterday)");
+                break;
+                
             case 'this_week':
-                return [date('Y-m-d', strtotime('monday this week')), $today];
+                $monday = date('Y-m-d', strtotime('monday this week'));
+                $result = [$monday, $today];
+                error_log("Date range: This week ($monday to $today)");
+                break;
+                
             case 'last_week':
-                return [
-                    date('Y-m-d', strtotime('monday last week')),
-                    date('Y-m-d', strtotime('sunday last week'))
-                ];
+                $monday = date('Y-m-d', strtotime('monday last week'));
+                $sunday = date('Y-m-d', strtotime('sunday last week'));
+                $result = [$monday, $sunday];
+                error_log("Date range: Last week ($monday to $sunday)");
+                break;
+                
             case 'this_month':
-                return [date('Y-m-01'), $today];
+                $firstDay = date('Y-m-01');
+                $result = [$firstDay, $today];
+                error_log("Date range: This month ($firstDay to $today)");
+                break;
+                
             case 'last_month':
-                return [
-                    date('Y-m-01', strtotime('first day of last month')),
-                    date('Y-m-t', strtotime('last day of last month'))
-                ];
+                $firstDay = date('Y-m-01', strtotime('first day of last month'));
+                $lastDay = date('Y-m-t', strtotime('last day of last month'));
+                $result = [$firstDay, $lastDay];
+                error_log("Date range: Last month ($firstDay to $lastDay)");
+                break;
+                
             case 'this_year':
-                return [date('Y-01-01'), $today];
+                $firstDay = date('Y-01-01');
+                $result = [$firstDay, $today];
+                error_log("Date range: This year ($firstDay to $today)");
+                break;
+                
             case 'last_year':
-                return [date('Y-01-01', strtotime('-1 year')), date('Y-12-31', strtotime('-1 year'))];
+                $firstDay = date('Y-01-01', strtotime('-1 year'));
+                $lastDay = date('Y-12-31', strtotime('-1 year'));
+                $result = [$firstDay, $lastDay];
+                error_log("Date range: Last year ($firstDay to $lastDay)");
+                break;
+                
             default:
-                return [date('Y-m-01'), $today];
+                error_log("Using default range (today)");
         }
+        
+        return $result;
     }
 
     private function getSalesData($startDate, $endDate)
@@ -303,4 +359,7 @@ class ReportsController
         fclose($output);
         exit;
     }
+
+    
+
 }

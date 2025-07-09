@@ -24,47 +24,29 @@ class ProductModel
     }
 
     // Update createProduct to handle clerk submissions
-public function createProduct($data)
-{
-    try {
-        $status = ($_SESSION['user']['role'] === 'inventory_clerk') ? 'pending' : 'approved';
-        $submittedBy = ($_SESSION['user']['role'] === 'inventory_clerk') ? $_SESSION['user']['id'] : null;
-        
-        $stmt = $this->db->prepare("
-            INSERT INTO products 
-            (name, category_id, price, cost_price, stock, barcode, status, submitted_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        
-        $categoryId = $data['category_id'] ?: null;
-        $barcode = $data['barcode'] ?: null;
-        $costPrice = $data['cost_price'] ?? null;
-        
-        $stmt->bind_param(
-            "sidddssi", 
-            $data['name'], 
-            $categoryId, 
-            $data['price'], 
-            $costPrice,
-            $data['stock'], 
-            $barcode,
-            $status,
-            $submittedBy
-        );
-        
-        $success = $stmt->execute();
-        $newId = $success ? $this->db->insert_id : 0;
-        $stmt->close();
-        
-        return $newId > 0 ? $newId : false;
-    } catch (Exception $e) {
-        error_log("Error creating product: " . $e->getMessage());
-        return false;
-    }
+public function createProduct($data) {
+    // Add status field if not set
+    $data['status'] = $data['status'] ?? 'pending';
+    
+    // Your existing insert logic, but make sure to include the status field
+    $sql = "INSERT INTO products (name, category_id, price, cost_price, stock, barcode, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)";
+    $stmt = $this->db->prepare($sql);
+    return $stmt->execute([
+        $data['name'],
+        $data['category_id'],
+        $data['price'],
+        $data['cost_price'],
+        $data['stock'],
+        $data['barcode'],
+        $data['status']
+    ]);
 }
+
 
     public function getProductById($id)
     {
+         $data['status'] = $data['status'] ?? 'pending';
         try {
         $stmt = $this->db->prepare("
             SELECT p.id, p.name, p.category_id, c.name as category_name, 
@@ -286,17 +268,23 @@ public function createAdjustmentRequest($data)
     }
 }
 
-public function createCostChangeRequest($data)
+// Add to your ProductModel class
+
+/**
+ * Creates a cost change request
+ */
+public function createCostChangeRequest(array $data): bool
 {
+    $this->db->begin_transaction();
     try {
         $stmt = $this->db->prepare("
             INSERT INTO pending_cost_changes 
-            (product_id, old_cost, new_cost, reason, submitted_by)
-            VALUES (?, ?, ?, ?, ?)
+            (product_id, old_cost, new_cost, reason, submitted_by, status, submitted_at) 
+            VALUES (?, ?, ?, ?, ?, 'pending', NOW())
         ");
         
         $stmt->bind_param(
-            "iddsi",
+            "iddsi", 
             $data['product_id'],
             $data['old_cost'],
             $data['new_cost'],
@@ -304,10 +292,146 @@ public function createCostChangeRequest($data)
             $data['submitted_by']
         );
         
-        return $stmt->execute();
+        $success = $stmt->execute();
+        $this->db->commit();
+        return $success;
     } catch (Exception $e) {
+        $this->db->rollback();
         error_log("Error creating cost change request: " . $e->getMessage());
         return false;
+    }
+}
+
+/**
+ * Approves a cost change request and updates product cost
+ */
+public function approveCostChange(int $id, int $approvedBy, ?string $notes = null): bool
+{
+    $this->db->begin_transaction();
+    try {
+        // 1. Get the pending change
+        $stmt = $this->db->prepare("
+            SELECT product_id, new_cost 
+            FROM pending_cost_changes 
+            WHERE id = ? AND status = 'pending'
+            FOR UPDATE
+        ");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $change = $result->fetch_assoc();
+        
+        if (!$change) {
+            throw new Exception("Pending cost change not found or already processed");
+        }
+
+        // 2. Update the product cost
+        $updateProduct = $this->db->prepare("
+            UPDATE products 
+            SET cost_price = ? 
+            WHERE id = ?
+        ");
+        $updateProduct->bind_param("di", $change['new_cost'], $change['product_id']);
+        $updateProduct->execute();
+        
+        if ($this->db->affected_rows === 0) {
+            throw new Exception("Product not found or cost not changed");
+        }
+
+        // 3. Mark the request as approved
+        $updateRequest = $this->db->prepare("
+            UPDATE pending_cost_changes 
+            SET status = 'approved',
+                approved_by = ?,
+                approved_at = NOW(),
+                notes = ?
+            WHERE id = ?
+        ");
+        $updateRequest->bind_param("isi", $approvedBy, $notes, $id);
+        $updateRequest->execute();
+        
+        $this->db->commit();
+        return true;
+    } catch (Exception $e) {
+        $this->db->rollback();
+        error_log("Error approving cost change: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Rejects a cost change request
+ */
+public function rejectCostChange(int $id, int $rejectedBy, string $reason): bool
+{
+    $this->db->begin_transaction();
+    try {
+        $stmt = $this->db->prepare("
+            UPDATE pending_cost_changes 
+            SET status = 'rejected',
+                approved_by = ?,
+                approved_at = NOW(),
+                notes = ?
+            WHERE id = ? AND status = 'pending'
+        ");
+        $stmt->bind_param("isi", $rejectedBy, $reason, $id);
+        $stmt->execute();
+        
+        if ($this->db->affected_rows === 0) {
+            throw new Exception("No pending cost change found with ID: $id");
+        }
+        
+        $this->db->commit();
+        return true;
+    } catch (Exception $e) {
+        $this->db->rollback();
+        error_log("Error rejecting cost change: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Gets all pending cost changes with product and user details
+ */
+public function getPendingCostChanges(): array
+{
+    try {
+        $query = "
+            SELECT 
+                pcc.*,
+                p.name as product_name,
+                u.name as submitted_by_name
+            FROM pending_cost_changes pcc
+            JOIN products p ON pcc.product_id = p.id
+            JOIN users u ON pcc.submitted_by = u.id
+            WHERE pcc.status = 'pending'
+            ORDER BY pcc.submitted_at DESC
+        ";
+        $result = $this->db->query($query);
+        return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    } catch (Exception $e) {
+        error_log("Error fetching pending cost changes: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Gets a specific pending cost change
+ */
+public function getPendingCostChange(int $id): ?array
+{
+    try {
+        $stmt = $this->db->prepare("
+            SELECT * FROM pending_cost_changes 
+            WHERE id = ?
+        ");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result->fetch_assoc() ?: null;
+    } catch (Exception $e) {
+        error_log("Error fetching pending cost change: " . $e->getMessage());
+        return null;
     }
 }
 
@@ -404,65 +528,52 @@ public function rejectProduct($id, $reason, $rejectedBy)
     }
 }
 
-public function approveAdjustment($id, $approvedBy, $notes = null)
-{
+// In ProductModel
+public function approveAdjustment($id, $approvedBy, $notes = null) {
+    $this->db->begin_transaction();
+
     try {
-        $this->db->begin_transaction();
-        
-        // Get the adjustment
-        $stmt = $this->db->prepare("
-            SELECT * FROM pending_stock_adjustments 
-            WHERE id = ? AND status = 'pending'
-            FOR UPDATE
-        ");
+        // Get the adjustment request
+        $sql = "SELECT * FROM stock_adjustments WHERE id = ?";
+        $stmt = $this->db->prepare($sql);
+        if ($stmt === false) {
+            throw new Exception("Prepare failed: " . $this->db->error);
+        }
         $stmt->bind_param("i", $id);
         $stmt->execute();
-        $adjustment = $stmt->get_result()->fetch_assoc();
-        
-        if (!$adjustment) {
-            throw new Exception("Adjustment not found or already processed");
+        $result = $stmt->get_result();
+        $request = $result->fetch_assoc();
+
+        if (!$request) {
+            throw new Exception("Adjustment request not found");
         }
-        
-        // Update product stock
-        $change = $adjustment['change_type'] === 'add' ? 
-            $adjustment['change_amount'] : -$adjustment['change_amount'];
-        
-        $stmt = $this->db->prepare("
-            UPDATE products 
-            SET stock = stock + ? 
-            WHERE id = ?
-        ");
-        $stmt->bind_param("ii", $change, $adjustment['product_id']);
-        $stmt->execute();
-        
-        // Record the adjustment
-        $stmt = $this->db->prepare("
-            INSERT INTO stock_adjustments 
-            (product_id, batch_id, change_amount, reason, adjusted_by)
-            VALUES (?, ?, ?, ?, ?)
-        ");
-        $stmt->bind_param(
-            "iiisi",
-            $adjustment['product_id'],
-            $adjustment['batch_id'],
-            $change,
-            $adjustment['reason'],
-            $approvedBy
-        );
-        $stmt->execute();
-        
-        // Update the pending adjustment
-        $stmt = $this->db->prepare("
-            UPDATE pending_stock_adjustments 
-            SET status = 'approved', 
-                approved_by = ?,
-                notes = ?,
-                approved_at = NOW()
-            WHERE id = ?
-        ");
-        $stmt->bind_param("isi", $approvedBy, $notes, $id);
-        $stmt->execute();
-        
+
+        // Update the product's stock
+        if ($request['change_type'] === 'add') {
+            $updateSql = "UPDATE products SET stock = stock + ? WHERE id = ?";
+        } else {
+            $updateSql = "UPDATE products SET stock = stock - ? WHERE id = ?";
+        }
+        $updateStmt = $this->db->prepare($updateSql);
+        if ($updateStmt === false) {
+            throw new Exception("Prepare failed: " . $this->db->error);
+        }
+        $updateStmt->bind_param("ii", $request['change_amount'], $request['product_id']);
+        $updateStmt->execute();
+
+        // Mark the request as approved
+        $approveSql = "UPDATE stock_adjustments 
+                       SET status = 'approved', 
+                           approved_by = ?,
+                           approved_at = NOW(),
+                           notes = ?
+                       WHERE id = ?";
+        $approveStmt = $this->db->prepare($approveSql);
+        if ($approveStmt === false) {
+            throw new Exception("Prepare failed: " . $this->db->error);
+        }
+        $approveStmt->bind_param("isi", $approvedBy, $notes, $id);
+        $approveStmt->execute();
         $this->db->commit();
         return true;
     } catch (Exception $e) {
@@ -472,108 +583,26 @@ public function approveAdjustment($id, $approvedBy, $notes = null)
     }
 }
 
-public function rejectAdjustment($id, $approvedBy, $reason)
-{
-    try {
-        $stmt = $this->db->prepare("
-            UPDATE pending_stock_adjustments 
+public function rejectAdjustment($id, $rejectedBy, $reason) {
+    $sql = "UPDATE stock_adjustments 
             SET status = 'rejected', 
-                approved_by = ?,
-                notes = ?,
-                approved_at = NOW()
-            WHERE id = ? AND status = 'pending'
-        ");
-        $stmt->bind_param("isi", $approvedBy, $reason, $id);
-        return $stmt->execute();
-    } catch (Exception $e) {
-        error_log("Error rejecting adjustment: " . $e->getMessage());
+                rejected_by = ?,
+                rejected_at = NOW(),
+                rejection_reason = ?
+            WHERE id = ?";
+    $stmt = $this->db->prepare($sql);
+    if ($stmt === false) {
+        error_log("Prepare failed: " . $this->db->error);
         return false;
     }
+    $stmt->bind_param("isi", $rejectedBy, $reason, $id);
+    $success = $stmt->execute();
+    $stmt->close();
+    return $success;
 }
 
-public function approveCostChange($id, $approvedBy, $notes = null)
-{
-    try {
-        $this->db->begin_transaction();
-        
-        // Get the cost change request
-        $stmt = $this->db->prepare("
-            SELECT * FROM pending_cost_changes 
-            WHERE id = ? AND status = 'pending'
-            FOR UPDATE
-        ");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
-        $change = $stmt->get_result()->fetch_assoc();
-        
-        if (!$change) {
-            throw new Exception("Cost change not found or already processed");
-        }
-        
-        // Update product cost
-        $stmt = $this->db->prepare("
-            UPDATE products 
-            SET cost_price = ? 
-            WHERE id = ?
-        ");
-        $stmt->bind_param("di", $change['new_cost'], $change['product_id']);
-        $stmt->execute();
-        
-        // Record the cost change
-        $stmt = $this->db->prepare("
-            INSERT INTO cost_change_history 
-            (product_id, old_cost, new_cost, reason, changed_by)
-            VALUES (?, ?, ?, ?, ?)
-        ");
-        $stmt->bind_param(
-            "iddsi",
-            $change['product_id'],
-            $change['old_cost'],
-            $change['new_cost'],
-            $change['reason'],
-            $approvedBy
-        );
-        $stmt->execute();
-        
-        // Update the pending cost change
-        $stmt = $this->db->prepare("
-            UPDATE pending_cost_changes 
-            SET status = 'approved', 
-                approved_by = ?,
-                notes = ?,
-                approved_at = NOW()
-            WHERE id = ?
-        ");
-        $stmt->bind_param("isi", $approvedBy, $notes, $id);
-        $stmt->execute();
-        
-        $this->db->commit();
-        return true;
-    } catch (Exception $e) {
-        $this->db->rollback();
-        error_log("Error approving cost change: " . $e->getMessage());
-        return false;
-    }
-}
 
-public function rejectCostChange($id, $approvedBy, $reason)
-{
-    try {
-        $stmt = $this->db->prepare("
-            UPDATE pending_cost_changes 
-            SET status = 'rejected', 
-                approved_by = ?,
-                notes = ?,
-                approved_at = NOW()
-            WHERE id = ? AND status = 'pending'
-        ");
-        $stmt->bind_param("isi", $approvedBy, $reason, $id);
-        return $stmt->execute();
-    } catch (Exception $e) {
-        error_log("Error rejecting cost change: " . $e->getMessage());
-        return false;
-    }
-}
+
 
 public function getPendingAdjustments()
 {
@@ -593,26 +622,6 @@ public function getPendingAdjustments()
         return [];
     }
 }
-
-public function getPendingCostChanges()
-{
-    try {
-        $query = "
-            SELECT pcc.*, p.name as product_name, u.name as submitted_by_name
-            FROM pending_cost_changes pcc
-            JOIN products p ON pcc.product_id = p.id
-            JOIN users u ON pcc.submitted_by = u.id
-            WHERE pcc.status = 'pending'
-            ORDER BY pcc.submitted_at DESC
-        ";
-        $result = $this->db->query($query);
-        return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
-    } catch (Exception $e) {
-        error_log("Error fetching pending cost changes: " . $e->getMessage());
-        return [];
-    }
-}
-
 
 
 }

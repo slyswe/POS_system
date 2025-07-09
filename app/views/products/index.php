@@ -103,8 +103,14 @@ foreach ($pendingProducts as $product) {
             <div class="panel-header">
                 <div class="tabs">
                     <button class="tab active" onclick="showTab('approved-products')">Active Products</button>
+                    <button class="tab" onclick="showTab('pending-products')">
+                        Pending Products Approval
+                        <?php if (count($pendingProducts) > 0): ?>
+                            <span class="badge"><?= count($pendingProducts) ?></span>
+                        <?php endif; ?>
+                    </button>
                     <button class="tab" onclick="showTab('pending-adjustments')">
-                        Pending Adjustments
+                        Pending Stock Adjustments
                         <?php if ($pendingAdjustmentCount > 0): ?>
                             <span class="badge"><?= $pendingAdjustmentCount ?></span>
                         <?php endif; ?>
@@ -260,7 +266,56 @@ foreach ($pendingProducts as $product) {
                 <?php endif; ?>
             </div>
 
-              <!-- pending approvals -->                      
+              <!-- pending approvals -->
+            <div id="pending-products" class="tab-content" style="display: none;">
+                <?php if (empty($pendingProducts)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-check-circle"></i>
+                        <h3>No Pending Products</h3>
+                        <p>All products have been reviewed</p>
+                    </div>
+                <?php else: ?>
+                    <table class="products-table">
+                        <thead>
+                            <tr>
+                                <th>Product Name</th>
+                                <th>Category</th>
+                                <th>Buying Price</th>
+                                <th>Proposed Selling Price</th>
+                                <th>Stock</th>
+                                <th>Submitted By</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($pendingProducts as $product): ?>
+                            <tr data-id="<?= $product['id'] ?>">
+                                <td><?= htmlspecialchars($product['name']) ?></td>
+                                <td><?= htmlspecialchars($product['category_name'] ?? 'Uncategorized') ?></td>
+                                <td><?= number_format($product['cost_price'], 2) ?> KSh</td>
+                                <td>
+                                    <input type="number" step="0.01" class="selling-price-input" 
+                                        data-id="<?= $product['id'] ?>" 
+                                        value="<?= number_format($product['price'], 2) ?>"
+                                        placeholder="Set selling price">
+                                </td>
+                                <td><?= $product['stock'] ?></td>
+                                <td><?= htmlspecialchars($product['submitted_by_name']) ?></td>
+                                <td>
+                                    <button class="btn btn-approve" onclick="approveProduct(<?= $product['id'] ?>)">
+                                        <i class="fas fa-check"></i> Approve
+                                    </button>
+                                    <button class="btn btn-reject" onclick="rejectProduct(<?= $product['id'] ?>)">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+
             <div id="pending-adjustments" class="tab-content" style="display: none;">
                 <?php if (empty($pendingAdjustments)): ?>
                     <div class="empty-state">
@@ -753,8 +808,91 @@ function rejectProduct(productId) {
     });
 }
 
+
+
+function approveProduct(productId) {
+    const sellingPriceInput = document.querySelector(`.selling-price-input[data-id="${productId}"]`);
+    const sellingPrice = sellingPriceInput ? parseFloat(sellingPriceInput.value) : 0;
+    
+    if (isNaN(sellingPrice) || sellingPrice <= 0) {
+        alert('Please enter a valid selling price');
+        return;
+    }
+    
+    fetch('/pos/public/products/approve/' + productId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            price: sellingPrice
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', 'Product approved successfully');
+            document.querySelector(`tr[data-id="${productId}"]`).remove();
+            
+            // Update badge count
+            const badge = document.querySelector('.tab .badge');
+            if (badge) {
+                const newCount = parseInt(badge.textContent) - 1;
+                badge.textContent = newCount;
+                if (newCount <= 0) {
+                    badge.remove();
+                }
+            }
+        } else {
+            showAlert('error', data.message || 'Approval failed');
+        }
+    })
+    .catch(error => {
+        showAlert('error', 'Network error');
+    });
+}
+
+function rejectProduct(productId) {
+    const reason = prompt('Please enter reason for rejection:');
+    if (reason === null) return;
+    
+    fetch('/pos/public/products/reject/' + productId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            reason: reason
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', 'Product rejected');
+            document.querySelector(`tr[data-id="${productId}"]`).remove();
+            
+            // Update badge count
+            const badge = document.querySelector('.tab .badge');
+            if (badge) {
+                const newCount = parseInt(badge.textContent) - 1;
+                badge.textContent = newCount;
+                if (newCount <= 0) {
+                    badge.remove();
+                }
+            }
+        } else {
+            showAlert('error', data.message || 'Rejection failed');
+        }
+    })
+    .catch(error => {
+        showAlert('error', 'Network error');
+    });
+}
+
 function approveCostChange(id) {
     const notes = prompt('Enter any approval notes (optional):');
+    if (notes === null) return; // User cancelled
+    
     fetch(`/pos/public/api/inventory/approve-cost-change/${id}`, {
         method: 'POST',
         headers: {
@@ -768,15 +906,21 @@ function approveCostChange(id) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Cost change approved successfully');
-            location.reload();
+            // Remove the row from the table
+            const row = document.querySelector(`tr[data-id="${id}"]`);
+            if (row) row.remove();
+            
+            // Update badge count
+            updatePendingBadge('pending-cost-changes');
+            
+            showAlert('success', 'Cost change approved successfully');
         } else {
-            alert('Error: ' + data.message);
+            showAlert('error', data.message || 'Approval failed');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Failed to approve cost change');
+        showAlert('error', 'Failed to approve cost change');
     });
 }
 
@@ -797,16 +941,35 @@ function rejectCostChange(id) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Cost change rejected');
-            location.reload();
+            // Remove the row from the table
+            const row = document.querySelector(`tr[data-id="${id}"]`);
+            if (row) row.remove();
+            
+            // Update badge count
+            updatePendingBadge('pending-cost-changes');
+            
+            showAlert('success', 'Cost change rejected');
         } else {
-            alert('Error: ' + data.message);
+            showAlert('error', data.message || 'Rejection failed');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Failed to reject cost change');
+        showAlert('error', 'Failed to reject cost change');
     });
+}
+
+// Helper function to update badge counts
+function updatePendingBadge(tabId) {
+    const badge = document.querySelector(`.tab[onclick="showTab('${tabId}')"] .badge`);
+    if (badge) {
+        const newCount = parseInt(badge.textContent) - 1;
+        if (newCount > 0) {
+            badge.textContent = newCount;
+        } else {
+            badge.remove();
+        }
+    }
 }
 
 // Export products

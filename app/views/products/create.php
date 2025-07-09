@@ -1,4 +1,7 @@
 <?php
+session_start();
+error_log('Session ID: ' . session_id());
+
 if (!defined('BASE_PATH')) {
     define('BASE_PATH', dirname(__DIR__, 3) . '/');
 }

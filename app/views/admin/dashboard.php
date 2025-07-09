@@ -407,7 +407,7 @@ $chart_data = $chart_data ?? [];
                         <i class="fas fa-truck"></i> <span>Suppliers</span>
                     </a>
                     
-                    <a href="/pos/public/profit_loss" class="nav-item">
+                    <a href="/pos/public/reports/profit_loss" class="nav-item">
                         <i class="fas fa-file-alt"></i> <span>Reports</span>
                     </a>
                 <?php endif; ?>

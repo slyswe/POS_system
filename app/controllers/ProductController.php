@@ -172,23 +172,37 @@ public function fetchSuppliers()
 
     
 
-    public function create()
-{
+    public function create() {
+   
+
+    // More permissive role check (matches your constructor)
+    if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['admin', 'inventory_clerk'])) {
+        header('Location: /pos/public/login');
+        exit;
+    }
+
     $error = '';
     require_once BASE_PATH . 'app/models/CategoryModel.php';
     $categoryModel = new \App\Models\CategoryModel();
     $categories = $categoryModel->getAllCategories();
 
     if ($_SERVER["REQUEST_METHOD"] === "POST") {
+        // Add debug logging
+        error_log('User role in create: ' . $_SESSION['user']['role']);
+        error_log('Session ID: ' . session_id());
+
         $data = [
             'name' => filter_input(INPUT_POST, 'name', FILTER_SANITIZE_STRING),
             'category_id' => filter_input(INPUT_POST, 'category_id', FILTER_VALIDATE_INT) ?: null,
             'price' => filter_input(INPUT_POST, 'price', FILTER_VALIDATE_FLOAT) ?: 0.0,
             'cost_price' => filter_input(INPUT_POST, 'cost_price', FILTER_VALIDATE_FLOAT) ?: 0.0,
             'stock' => filter_input(INPUT_POST, 'stock', FILTER_VALIDATE_INT) ?: 0,
-            'barcode' => filter_input(INPUT_POST, 'barcode', FILTER_SANITIZE_STRING) ?: null
+            'barcode' => filter_input(INPUT_POST, 'barcode', FILTER_SANITIZE_STRING) ?: null,
+            'status' => ($_SESSION['user']['role'] === 'inventory_clerk') ? 'pending' : 'active',
+            'submitted_by' => $_SESSION['user']['id']
         ];
 
+        // Handle new category creation
         $new_category = filter_input(INPUT_POST, 'new_category', FILTER_SANITIZE_STRING);
         if ($new_category && !$data['category_id']) {
             $category_id = $categoryModel->createCategory(['name' => $new_category]);
@@ -199,20 +213,31 @@ public function fetchSuppliers()
             }
         }
 
-        if (!$data['category_id']) {
-            $error = "Please select a category or enter a new one.";
-        }
-
-        if (!$error && $this->model->createProduct($data)) {
-            $_SESSION['success'] = 'Product created successfully.';
-            header("Location: /pos/public/products");
-            exit;
-        } else {
-            $error = $error ?: "Failed to add product.";
+        if (!$error) {
+            if ($this->model->createProduct($data)) {
+                // Store success message before redirect
+                $_SESSION['success'] = ($_SESSION['user']['role'] === 'inventory_clerk') 
+                    ? 'Product submitted for approval' 
+                    : 'Product created successfully';
+                
+                // Ensure no output before header
+                if (headers_sent()) {
+                    error_log('Headers already sent, cannot redirect');
+                    die('Redirect failed. Please <a href="/pos/public/products">click here</a> to continue.');
+                }
+                
+                // Use absolute URL for redirect
+                header("Location: /pos/public/products");
+                exit;
+            } else {
+                $error = "Failed to add product.";
+            }
         }
     }
+    
     require_once BASE_PATH . 'app/views/products/create.php';
 }
+
 
     public function edit($id)
 {
@@ -533,8 +558,7 @@ public function fetchSuppliers()
     exit;
 }
 
-public function submitCostChangeRequest()
-{
+public function submitCostChangeRequest() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $_SESSION['user']['role'] !== 'inventory_clerk') {
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
         exit;
@@ -561,7 +585,6 @@ public function submitCostChangeRequest()
     ]);
     exit;
 }
-
 public function approveAdjustment($id)
 {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $_SESSION['user']['role'] !== 'admin') {
@@ -602,8 +625,7 @@ public function rejectAdjustment($id)
     exit;
 }
 
-public function approveCostChange($id)
-{
+public function approveCostChange($id) {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $_SESSION['user']['role'] !== 'admin') {
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
         exit;
@@ -622,8 +644,7 @@ public function approveCostChange($id)
     exit;
 }
 
-public function rejectCostChange($id)
-{
+public function rejectCostChange($id) {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $_SESSION['user']['role'] !== 'admin') {
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
         exit;
@@ -631,9 +652,9 @@ public function rejectCostChange($id)
     
     $input = json_decode(file_get_contents('php://input'), true);
     $reason = filter_var($input['reason'], FILTER_SANITIZE_STRING);
-    $approvedBy = $_SESSION['user']['id'];
+    $rejectedBy = $_SESSION['user']['id'];
     
-    $success = $this->model->rejectCostChange($id, $approvedBy, $reason);
+    $success = $this->model->rejectCostChange($id, $rejectedBy, $reason);
     
     echo json_encode([
         'success' => $success,

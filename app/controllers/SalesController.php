@@ -366,6 +366,24 @@ class SalesController
         if ($_SESSION['training_mode'] ?? false) {
             error_log("Checkout attempted in training mode. Sale not saved.");
             $_SESSION['success'] = 'Sale processed in training mode (not saved).';
+            // Store cart data for receipt in training mode
+            $_SESSION['receipt_data'] = [
+                'cart' => $_SESSION['cart'] ?? [],
+                'subtotal' => 0,
+                'tax' => 0,
+                'discount' => floatval($_POST['discount'] ?? 0),
+                'total' => 0,
+                'amount_paid' => floatval($_POST['amount_paid'] ?? 0),
+                'payment_method' => $_POST['payment_method'] ?? 'cash',
+                'cashier_name' => $_SESSION['user']['name'] ?? 'Unknown',
+                'sale_id' => 'TRAINING-' . rand(1000, 9999),
+                'timestamp' => date('Y-m-d H:i:s')
+            ];
+            foreach ($_SESSION['cart'] as $item) {
+                $_SESSION['receipt_data']['subtotal'] += $item['price'] * $item['quantity'];
+            }
+            $_SESSION['receipt_data']['tax'] = $_SESSION['receipt_data']['subtotal'] * 0.16;
+            $_SESSION['receipt_data']['total'] = $_SESSION['receipt_data']['subtotal'] + $_SESSION['receipt_data']['tax'] - $_SESSION['receipt_data']['discount'];
             $_SESSION['cart'] = [];
             header('Location: /pos/public/sales/pos');
             exit;
@@ -434,7 +452,7 @@ class SalesController
 
             // Insert sale
             $query = "INSERT INTO sales (user_id, total, payment_method, timestamp, customer_id, discount) 
-                      VALUES (?, ?, ?, NOW(), ?, ?)";
+                    VALUES (?, ?, ?, NOW(), ?, ?)";
             $stmt = $conn->prepare($query);
             if ($stmt === false) {
                 throw new Exception("Prepare failed for sales insert: " . $conn->error);
@@ -448,7 +466,7 @@ class SalesController
 
             // Insert sale items
             $query = "INSERT INTO sale_items (sale_id, product_id, quantity, price) 
-                      VALUES (?, ?, ?, ?)";
+                    VALUES (?, ?, ?, ?)";
             $stmt = $conn->prepare($query);
             if ($stmt === false) {
                 throw new Exception("Prepare failed for sale_items insert: " . $conn->error);
@@ -488,9 +506,22 @@ class SalesController
             }
             $stmt->close();
 
-            // Commit transaction
             $conn->commit();
             error_log("Sale completed successfully. Sale ID: $saleId, User ID: $userId, Total: $total");
+
+            // Prepare receipt data
+            $_SESSION['receipt_data'] = [
+                'cart' => $cart,
+                'subtotal' => $subtotal,
+                'tax' => $tax,
+                'discount' => $discount,
+                'total' => $total,
+                'amount_paid' => $amountPaid,
+                'payment_method' => $paymentMethod,
+                'cashier_name' => $_SESSION['user']['name'] ?? 'Unknown',
+                'sale_id' => $saleId,
+                'timestamp' => date('Y-m-d H:i:s')
+            ];
 
             // Clear cart
             $_SESSION['cart'] = [];
