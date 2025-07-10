@@ -1409,15 +1409,10 @@ document.addEventListener('DOMContentLoaded', () => {
     updateTotal();
     filterProducts('all');
     document.getElementById('product-search').focus();
-    document.getElementById('product-search').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            e.target.closest('form').submit();
-        }
-    });
-
+    
+    // Handle receipt generation if we have receipt data in session
     if (typeof initialReceiptData !== 'undefined' && initialReceiptData && Object.keys(initialReceiptData.cart).length > 0) {
-        generateReceipt();
+        generateReceipt(initialReceiptData);
     }
 });
     </script>

@@ -109,18 +109,8 @@ foreach ($pendingProducts as $product) {
                             <span class="badge"><?= count($pendingProducts) ?></span>
                         <?php endif; ?>
                     </button>
-                    <button class="tab" onclick="showTab('pending-adjustments')">
-                        Pending Stock Adjustments
-                        <?php if ($pendingAdjustmentCount > 0): ?>
-                            <span class="badge"><?= $pendingAdjustmentCount ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <button class="tab" onclick="showTab('pending-cost-changes')">
-                        Pending Cost Changes
-                        <?php if ($pendingCostChangeCount > 0): ?>
-                            <span class="badge"><?= $pendingCostChangeCount ?></span>
-                        <?php endif; ?>
-                    </button>
+                    
+                    
                    
                 </div>
                 <div class="panel-actions">
@@ -316,93 +306,10 @@ foreach ($pendingProducts as $product) {
                 <?php endif; ?>
             </div>
 
-            <div id="pending-adjustments" class="tab-content" style="display: none;">
-                <?php if (empty($pendingAdjustments)): ?>
-                    <div class="empty-state">
-                        <i class="fas fa-check-circle"></i>
-                        <h3>No Pending Stock Adjustments</h3>
-                        <p>All adjustments have been reviewed</p>
-                    </div>
-                <?php else: ?>
-                    <table class="products-table">
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Batch</th>
-                                <th>Change</th>
-                                <th>Reason</th>
-                                <th>Submitted By</th>
-                                <th>Date</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($pendingAdjustments as $adj): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($adj['product_name']) ?></td>
-                                <td><?= $adj['batch_id'] ? '#' . $adj['batch_id'] : 'N/A' ?></td>
-                                <td><?= $adj['change_type'] === 'add' ? '+' : '-' ?><?= $adj['change_amount'] ?></td>
-                                <td><?= htmlspecialchars($adj['reason']) ?></td>
-                                <td><?= htmlspecialchars($adj['submitted_by_name']) ?></td>
-                                <td><?= date('m/d/Y', strtotime($adj['submitted_at'])) ?></td>
-                                <td>
-                                    <button class="btn btn-approve" onclick="approveAdjustment(<?= $adj['id'] ?>)">
-                                        <i class="fas fa-check"></i> Approve
-                                    </button>
-                                    <button class="btn btn-reject" onclick="rejectAdjustment(<?= $adj['id'] ?>)">
-                                        <i class="fas fa-times"></i> Reject
-                                    </button>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                <?php endif; ?>
-            </div>
+            
 
-            <div id="pending-cost-changes" class="tab-content" style="display: none;">
-                <?php if (empty($pendingCostChanges)): ?>
-                    <div class="empty-state">
-                        <i class="fas fa-check-circle"></i>
-                        <h3>No Pending Cost Changes</h3>
-                        <p>All cost changes have been reviewed</p>
-                    </div>
-                <?php else: ?>
-                    <table class="products-table">
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Current Cost</th>
-                                <th>New Cost</th>
-                                <th>Reason</th>
-                                <th>Submitted By</th>
-                                <th>Date</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($pendingCostChanges as $change): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($change['product_name']) ?></td>
-                                <td><?= number_format($change['old_cost'], 2) ?> KSh</td>
-                                <td><?= number_format($change['new_cost'], 2) ?> KSh</td>
-                                <td><?= htmlspecialchars($change['reason']) ?></td>
-                                <td><?= htmlspecialchars($change['submitted_by_name']) ?></td>
-                                <td><?= date('m/d/Y', strtotime($change['submitted_at'])) ?></td>
-                                <td>
-                                    <button class="btn btn-approve" onclick="approveCostChange(<?= $change['id'] ?>)">
-                                        <i class="fas fa-check"></i> Approve
-                                    </button>
-                                    <button class="btn btn-reject" onclick="rejectCostChange(<?= $change['id'] ?>)">
-                                        <i class="fas fa-times"></i> Reject
-                                    </button>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                <?php endif; ?>
-            </div>
+            
+             
 
             <!-- Existing products table - wrap in tab-content -->
             <div id="approved-products" class="tab-content">

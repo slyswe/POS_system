@@ -453,9 +453,9 @@ foreach ($products as $product) {
                                 <th class="financial-column">Buying Price</th>
                                 <th>Selling Price</th>
                                 <th>Barcode</th>
-                                <th>Batch</th>
+                                
                                 <th>Stock</th>
-                                <th>Actions</th>
+                                
                             </tr>
                         </thead>
                         <tbody>
@@ -475,30 +475,15 @@ foreach ($products as $product) {
                                     <td><?= htmlspecialchars($cat['name']) ?></td>
                                     <td class="financial-column">
                                         <span class="cost-price"><?= number_format($product['cost_price'], 2) ?></span> KSh
-                                        <button class="btn-edit-cost" onclick="editCostPrice(event, <?= $product['id'] ?>)">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
+                                        
                                     </td>
                                     <td><?= number_format($product['price'], 2) ?> KSh</td>
                                     <td><?= htmlspecialchars($product['barcode'] ?? 'N/A') ?></td>
-                                    <td>
-                                        <select class="batch-select" data-product="<?= $product['id'] ?>">
-                                            <?php foreach ($product_batches as $batch): ?>
-                                            <option value="<?= $batch['id'] ?>">
-                                                #<?= $batch['id'] ?> (<?= date('m/d/Y', strtotime($batch['received_date'])) ?>)
-                                            </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </td>
+                                    
                                     <td class="stock-cell <?= $stock_class ?>">
                                         <?= htmlspecialchars($product['stock']) ?>
                                     </td>
-                                    <td>
-                                        <button class="btn btn-primary btn-sm" 
-                                                onclick="adjustStock(<?= $product['id'] ?>, '<?= htmlspecialchars($product['name']) ?>')">
-                                            <i class="fas fa-exchange-alt"></i> Adjust
-                                        </button>
-                                    </td>
+                                    
                                 </tr>
                                 <?php endforeach; ?>
                             <?php endforeach; ?>
@@ -584,7 +569,7 @@ foreach ($products as $product) {
                     </button>
                     
                     <button type="submit" class="btn btn-success">
-                        <i class="fas fa-check"></i> Process Receipt
+                        <i class="fas fa-check"></i> save
                     </button>
 
                     
@@ -617,90 +602,7 @@ foreach ($products as $product) {
     </main>
 </div>
 
-<!-- Stock Adjustment Modal -->
-<div id="stock-modal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal()">&times;</span>
-        <h2>Adjust Stock for <span id="modal-product-name"></span></h2>
-        <form id="stock-form">
-            <input type="hidden" id="product-id">
-            <input type="hidden" id="batch-id">
-            
-            <div class="form-group">
-                <label for="stock-change">Quantity Change</label>
-                <div class="input-group">
-                    <select id="change-type" class="form-control" style="max-width: 100px;">
-                        <option value="+">Add</option>
-                        <option value="-">Remove</option>
-                    </select>
-                    <input type="number" id="stock-change" class="form-control" min="1" required>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="reason">Reason</label>
-                <select id="reason" class="form-control" required>
-                    <option value="">Select Reason</option>
-                    <option value="restock">Restock</option>
-                    <option value="damage">Damage</option>
-                    <option value="theft">Theft</option>
-                    <option value="expired">Expired</option>
-                    <option value="other">Other</option>
-                </select>
-            </div>
-            
-            <div class="form-group" id="supplier-group" style="display: none;">
-                <label for="supplier">Supplier</label>
-                <select id="supplier" class="form-control">
-                    <option value="">Select Supplier</option>
-                    <?php foreach ($suppliers as $supplier): ?>
-                    <option value="<?= $supplier['id'] ?>"><?= htmlspecialchars($supplier['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            
-            <div class="form-group" id="cost-group" style="display: none;">
-                <label for="unit-cost">Unit Cost</label>
-                <input type="number" step="0.01" id="unit-cost" class="form-control">
-            </div>
-            
-            <div class="form-group" id="invoice-group" style="display: none;">
-                <label for="invoice-ref">Invoice Reference</label>
-                <input type="text" id="invoice-ref" class="form-control">
-            </div>
-            
-            <div class="form-group" id="other-reason-group" style="display: none;">
-                <label for="other-reason">Specify Reason</label>
-                <input type="text" id="other-reason" class="form-control">
-            </div>
-            
-            <button type="submit" class="btn btn-primary">Submit Adjustment</button>
-        </form>
-    </div>
-</div>
 
-<!-- Cost Price Edit Modal -->
-<div id="cost-modal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeCostModal()">&times;</span>
-        <h2>Edit Cost Price for <span id="cost-modal-product-name"></span></h2>
-        <form id="cost-form">
-            <input type="hidden" id="cost-product-id">
-            
-            <div class="form-group">
-                <label for="new-cost">New Cost Price (KSh)</label>
-                <input type="number" step="0.01" id="new-cost" class="form-control" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="cost-change-reason">Reason for Change</label>
-                <input type="text" id="cost-change-reason" class="form-control" required>
-            </div>
-            
-            <button type="submit" class="btn btn-primary">Update Cost</button>
-        </form>
-    </div>
-</div>
 
 
 <script>

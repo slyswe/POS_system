@@ -358,7 +358,7 @@ class SalesController
     public function checkout()
     {
         // Allow access to cashiers and admins
-        if ($_SESSION['user']['role'] !== 'cashier' && $_SESSION['user']['role'] !== 'admin') {
+        if ($_SESSION['user']['role'] !== 'cashier') {
             header('Location: /pos/public/login');
             exit;
         }
