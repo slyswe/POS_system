@@ -181,16 +181,15 @@ $categories = $categories ?? [
                 </div>
                 <!-- Search -->
                 <div class="p-5">
-                    <div class="relative">
+                    <div class="relative search-bar">
                         <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
-                        <form method="POST" action="/pos/public/sales/pos">
-                            <div class="flex gap-2">
-                                <input type="text" name="barcode" id="product-search" placeholder="Scan barcode or search products..." class="w-full pl-12 pr-4 py-4 bg-white border border-transparent focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-xl shadow-sm transition">
-                                <button type="submit" name="add_to_cart" class="px-4 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition">
-                                    <i class="fas fa-plus"></i> Add
-                                </button>
-                            </div>
-                        </form>
+                        <div class="flex gap-2">
+                            <input type="text" id="product-search" placeholder="Scan barcode or search products..." 
+                                class="w-full pl-12 pr-4 py-4 bg-white border border-transparent focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-xl shadow-sm transition">
+                            <button id="search-button" class="px-4 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition">
+                                <i class="fas fa-plus"></i> Add
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <!-- Filters -->
@@ -616,8 +615,7 @@ $categories = $categories ?? [
 
         // Function to add product by search term
         // New search function
-async function searchProducts(searchTerm) {
-    console.log('searchProducts called with:', searchTerm);
+        async function searchProducts(searchTerm) {
     try {
         const baseUrl = document.querySelector('meta[name="base-url"]').content;
         const response = await fetch(`${baseUrl}/products/search?q=${encodeURIComponent(searchTerm)}`, {
@@ -627,8 +625,17 @@ async function searchProducts(searchTerm) {
             }
         });
         
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
-        displaySearchResults(data.products);
+        
+        if (data.success && data.products) {
+            displaySearchResults(data.products);
+        } else {
+            showAlert('error', data.message || 'No products found');
+        }
     } catch (error) {
         console.error('Search error:', error);
         showAlert('error', 'Failed to search products');
@@ -637,9 +644,11 @@ async function searchProducts(searchTerm) {
 
 function displaySearchResults(products) {
     const productList = document.getElementById('product-list');
+    if (!productList) return;
+    
     productList.innerHTML = '';
     
-    if (products.length === 0) {
+    if (!products || products.length === 0) {
         productList.innerHTML = '<div class="col-span-full text-center py-8 text-slate-500">No products found</div>';
         return;
     }
@@ -666,6 +675,8 @@ function displaySearchResults(products) {
         productList.appendChild(productItem);
     });
 }
+
+
         // Add product to cart
         async function addProductToCart(productId, event) {
             try {
@@ -1623,11 +1634,22 @@ function trapFocus(e) {
 document.addEventListener('DOMContentLoaded', () => {
 
     const searchInput = document.getElementById('product-search');
-    if (searchInput) {
+    const searchButton = document.getElementById('search-button');
+    
+    if (searchInput && searchButton) {
+        // Handle search button click
+        searchButton.addEventListener('click', function() {
+            const searchTerm = searchInput.value.trim();
+            if (searchTerm) {
+                searchProducts(searchTerm);
+            }
+        });
+        
+        // Handle Enter key in search input
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                const searchTerm = this.value.trim();
+                const searchTerm = searchInput.value.trim();
                 if (searchTerm) {
                     searchProducts(searchTerm);
                 }

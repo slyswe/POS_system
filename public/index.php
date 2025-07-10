@@ -142,7 +142,10 @@ switch ($request) {
         $controller = new \App\Controllers\SalesController();
         $controller->pos();
         break;
-  
+    case '/pos/public/sales/search':
+        $controller = new \App\Controllers\SalesController();
+        $controller->searchProducts();
+        break;
 
     case '/pos/public/sales/checkout':
         $controller = new \App\Controllers\SalesController();

@@ -355,6 +355,71 @@ class SalesController
         include BASE_PATH . 'app/views/sales/pos.php';
     }
 
+    public function searchProducts()
+{
+    // Allow access to cashiers and admins
+    if ($_SESSION['user']['role'] !== 'cashier') {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
+        exit;
+    }
+
+    $searchTerm = $_GET['q'] ?? '';
+    if (empty($searchTerm)) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Search term is required']);
+        exit;
+    }
+
+    require_once BASE_PATH . 'config/database.php';
+    $conn = new \mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+    if ($conn->connect_error) {
+        error_log("Database connection failed: " . $conn->connect_error);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Database connection failed']);
+        exit;
+    }
+
+    // Prepare search query (using LIKE for partial matches)
+    $searchTerm = '%' . $conn->real_escape_string($searchTerm) . '%';
+    $query = "SELECT id, name, price, stock, image FROM products 
+              WHERE name LIKE ? OR barcode LIKE ?
+              ORDER BY name LIMIT 20";
+    
+    $stmt = $conn->prepare($query);
+    if ($stmt === false) {
+        error_log("Prepare failed: " . $conn->error);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Database error']);
+        exit;
+    }
+
+    $stmt->bind_param("ss", $searchTerm, $searchTerm);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $products = [];
+    while ($row = $result->fetch_assoc()) {
+        $products[] = [
+            'id' => $row['id'],
+            'name' => $row['name'],
+            'price' => (float)$row['price'],
+            'stock' => (int)$row['stock'],
+            'image' => $row['image'] ? '/pos/public/uploads/' . $row['image'] : null
+        ];
+    }
+
+    $stmt->close();
+    $conn->close();
+
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => true,
+        'products' => $products
+    ]);
+    exit;
+}
+
     
 
     public function checkout()
