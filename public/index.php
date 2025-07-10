@@ -142,6 +142,8 @@ switch ($request) {
         $controller = new \App\Controllers\SalesController();
         $controller->pos();
         break;
+  
+
     case '/pos/public/sales/checkout':
         $controller = new \App\Controllers\SalesController();
         $controller->checkout();

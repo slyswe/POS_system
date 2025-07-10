@@ -241,7 +241,7 @@ class SalesController
     public function pos()
     {
         // Allow access to cashiers and admins
-        if ($_SESSION['user']['role'] !== 'cashier' && $_SESSION['user']['role'] !== 'admin') {
+        if ($_SESSION['user']['role'] !== 'cashier') {
             header('Location: /pos/public/login');
             exit;
         }
@@ -355,185 +355,269 @@ class SalesController
         include BASE_PATH . 'app/views/sales/pos.php';
     }
 
+    
+
     public function checkout()
-    {
-        // Allow access to cashiers and admins
-        if ($_SESSION['user']['role'] !== 'cashier') {
-            header('Location: /pos/public/login');
+{
+    // Allow access to cashiers and admins
+    if ($_SESSION['user']['role'] !== 'cashier') {
+        if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
             exit;
         }
+        header('Location: /pos/public/login');
+        exit;
+    }
 
-        if ($_SESSION['training_mode'] ?? false) {
-            error_log("Checkout attempted in training mode. Sale not saved.");
-            $_SESSION['success'] = 'Sale processed in training mode (not saved).';
-            // Store cart data for receipt in training mode
-            $_SESSION['receipt_data'] = [
-                'cart' => $_SESSION['cart'] ?? [],
-                'subtotal' => 0,
-                'tax' => 0,
-                'discount' => floatval($_POST['discount'] ?? 0),
-                'total' => 0,
-                'amount_paid' => floatval($_POST['amount_paid'] ?? 0),
-                'payment_method' => $_POST['payment_method'] ?? 'cash',
-                'cashier_name' => $_SESSION['user']['name'] ?? 'Unknown',
-                'sale_id' => 'TRAINING-' . rand(1000, 9999),
-                'timestamp' => date('Y-m-d H:i:s')
-            ];
-            foreach ($_SESSION['cart'] as $item) {
-                $_SESSION['receipt_data']['subtotal'] += $item['price'] * $item['quantity'];
-            }
-            $_SESSION['receipt_data']['tax'] = $_SESSION['receipt_data']['subtotal'] * 0.16;
-            $_SESSION['receipt_data']['total'] = $_SESSION['receipt_data']['subtotal'] + $_SESSION['receipt_data']['tax'] - $_SESSION['receipt_data']['discount'];
-            $_SESSION['cart'] = [];
-            header('Location: /pos/public/sales/pos');
+    // Check if this is an AJAX request
+    $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest';
+
+    // Handle training mode first
+    if ($_SESSION['training_mode'] ?? false) {
+        error_log("Checkout attempted in training mode. Sale not saved.");
+        
+        // Prepare receipt data
+        $receiptData = [
+            'cart' => $_SESSION['cart'] ?? [],
+            'subtotal' => 0,
+            'tax' => 0,
+            'discount' => floatval($_POST['discount'] ?? 0),
+            'total' => 0,
+            'amount_paid' => floatval($_POST['amount_paid'] ?? 0),
+            'payment_method' => $_POST['payment_method'] ?? 'cash',
+            'cashier_name' => $_SESSION['user']['name'] ?? 'Unknown',
+            'sale_id' => 'TRAINING-' . rand(1000, 9999),
+            'timestamp' => date('Y-m-d H:i:s')
+        ];
+        
+        // Calculate totals
+        foreach ($_SESSION['cart'] as $item) {
+            $receiptData['subtotal'] += $item['price'] * $item['quantity'];
+        }
+        $receiptData['tax'] = $receiptData['subtotal'] * 0.16;
+        $receiptData['total'] = $receiptData['subtotal'] + $receiptData['tax'] - $receiptData['discount'];
+        
+        // Store for receipt generation
+        $_SESSION['receipt_data'] = $receiptData;
+        $_SESSION['cart'] = [];
+
+        if ($isAjax) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Sale processed in training mode (not saved)',
+                'receipt_data' => $receiptData
+            ]);
             exit;
         }
+        
+        $_SESSION['success'] = 'Sale processed in training mode (not saved).';
+        header('Location: /pos/public/sales/pos');
+        exit;
+    }
 
-        require_once BASE_PATH . 'config/database.php';
-        $conn = new \mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-        if ($conn->connect_error) {
-            error_log("Database connection failed in checkout: " . $conn->connect_error);
-            $_SESSION['error'] = 'Database connection failed. Please try again.';
-            header('Location: /pos/public/sales/pos');
+    require_once BASE_PATH . 'config/database.php';
+    $conn = new \mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+    if ($conn->connect_error) {
+        error_log("Database connection failed in checkout: " . $conn->connect_error);
+        
+        if ($isAjax) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Database connection failed']);
             exit;
         }
+        
+        $_SESSION['error'] = 'Database connection failed. Please try again.';
+        header('Location: /pos/public/sales/pos');
+        exit;
+    }
 
-        // Validate user_id
-        $userId = isset($_POST['user_id']) ? (int)$_POST['user_id'] : ($_SESSION['user']['id'] ?? null);
-        if (!$userId) {
-            error_log("Invalid or missing user_id in checkout.");
-            $_SESSION['error'] = 'User authentication failed. Please log in again.';
-            $conn->close();
-            header('Location: /pos/public/login');
+    // Validate inputs
+    $userId = isset($_POST['user_id']) ? (int)$_POST['user_id'] : ($_SESSION['user']['id'] ?? null);
+    $customerId = isset($_POST['customer_id']) && $_POST['customer_id'] !== '' ? (int)$_POST['customer_id'] : null;
+    $discount = floatval($_POST['discount'] ?? 0);
+    $amountPaid = floatval($_POST['amount_paid'] ?? 0);
+    $paymentMethod = $_POST['payment_method'] ?? 'cash';
+    $cart = $_SESSION['cart'] ?? [];
+
+    if (!$userId) {
+        $error = 'User authentication failed. Please log in again.';
+        error_log("Invalid or missing user_id in checkout.");
+        
+        if ($isAjax) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => $error]);
             exit;
         }
+        
+        $_SESSION['error'] = $error;
+        $conn->close();
+        header('Location: /pos/public/login');
+        exit;
+    }
 
-        $customerId = isset($_POST['customer_id']) && $_POST['customer_id'] !== '' ? (int)$_POST['customer_id'] : null;
-        $discount = floatval($_POST['discount'] ?? 0);
-        $amountPaid = floatval($_POST['amount_paid'] ?? 0);
-        $paymentMethod = $_POST['payment_method'] ?? 'cash';
-        $cart = $_SESSION['cart'] ?? [];
-
-        if (empty($cart)) {
-            error_log("Checkout attempted with empty cart.");
-            $_SESSION['error'] = 'Cart is empty.';
-            $conn->close();
-            header('Location: /pos/public/sales/pos');
+    if (empty($cart)) {
+        $error = 'Cannot checkout with an empty cart.';
+        error_log("Checkout attempted with empty cart.");
+        
+        if ($isAjax) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => $error]);
             exit;
         }
-
-        // Calculate subtotal and total
-        $subtotal = 0;
-        foreach ($cart as $item) {
-            $subtotal += $item['price'] * $item['quantity'];
-        }
-        $tax = $subtotal * 0.16;
-        $total = $subtotal + $tax - $discount;
-
-        if ($amountPaid < $total) {
-            error_log("Checkout failed: Insufficient amount paid. Paid: $amountPaid, Required: $total");
-            $_SESSION['error'] = 'Insufficient amount paid.';
-            $conn->close();
-            header('Location: /pos/public/sales/pos');
-            exit;
-        }
-
-        // Begin transaction
-        $conn->begin_transaction();
-        try {
-            // Verify user exists
-            $stmt = $conn->prepare("SELECT id FROM users WHERE id = ?");
-            $stmt->bind_param("i", $userId);
-            $stmt->execute();
-            if (!$stmt->get_result()->fetch_assoc()) {
-                throw new Exception("Invalid user_id: $userId");
-            }
-            $stmt->close();
-
-            // Insert sale
-            $query = "INSERT INTO sales (user_id, total, payment_method, timestamp, customer_id, discount) 
-                    VALUES (?, ?, ?, NOW(), ?, ?)";
-            $stmt = $conn->prepare($query);
-            if ($stmt === false) {
-                throw new Exception("Prepare failed for sales insert: " . $conn->error);
-            }
-            $stmt->bind_param("idssd", $userId, $total, $paymentMethod, $customerId, $discount);
-            if (!$stmt->execute()) {
-                throw new Exception("Failed to insert sale: " . $stmt->error);
-            }
-            $saleId = $conn->insert_id;
-            $stmt->close();
-
-            // Insert sale items
-            $query = "INSERT INTO sale_items (sale_id, product_id, quantity, price) 
-                    VALUES (?, ?, ?, ?)";
-            $stmt = $conn->prepare($query);
-            if ($stmt === false) {
-                throw new Exception("Prepare failed for sale_items insert: " . $conn->error);
-            }
-            foreach ($cart as $productId => $item) {
-                $productId = (int)$productId;
-                // Verify product exists and has sufficient stock
-                $checkStmt = $conn->prepare("SELECT stock FROM products WHERE id = ? FOR UPDATE");
-                $checkStmt->bind_param("i", $productId);
-                $checkStmt->execute();
-                $result = $checkStmt->get_result();
-                if ($row = $result->fetch_assoc()) {
-                    if ($row['stock'] < $item['quantity']) {
-                        throw new Exception("Insufficient stock for product ID $productId");
-                    }
-                } else {
-                    throw new Exception("Product ID $productId not found");
-                }
-                $checkStmt->close();
-
-                $stmt->bind_param("iiid", $saleId, $productId, $item['quantity'], $item['price']);
-                if (!$stmt->execute()) {
-                    throw new Exception("Failed to insert sale item for product ID $productId: " . $stmt->error);
-                }
-
-                // Update product stock
-                $updateQuery = "UPDATE products SET stock = stock - ? WHERE id = ?";
-                $updateStmt = $conn->prepare($updateQuery);
-                if ($updateStmt === false) {
-                    throw new Exception("Prepare failed for stock update: " . $conn->error);
-                }
-                $updateStmt->bind_param("ii", $item['quantity'], $productId);
-                if (!$updateStmt->execute()) {
-                    throw new Exception("Failed to update stock for product ID $productId: " . $updateStmt->error);
-                }
-                $updateStmt->close();
-            }
-            $stmt->close();
-
-            $conn->commit();
-            error_log("Sale completed successfully. Sale ID: $saleId, User ID: $userId, Total: $total");
-
-            // Prepare receipt data
-            $_SESSION['receipt_data'] = [
-                'cart' => $cart,
-                'subtotal' => $subtotal,
-                'tax' => $tax,
-                'discount' => $discount,
-                'total' => $total,
-                'amount_paid' => $amountPaid,
-                'payment_method' => $paymentMethod,
-                'cashier_name' => $_SESSION['user']['name'] ?? 'Unknown',
-                'sale_id' => $saleId,
-                'timestamp' => date('Y-m-d H:i:s')
-            ];
-
-            // Clear cart
-            $_SESSION['cart'] = [];
-            $_SESSION['success'] = 'Sale completed successfully.';
-        } catch (\Exception $e) {
-            $conn->rollback();
-            error_log("Checkout failed: " . $e->getMessage());
-            $_SESSION['error'] = 'Failed to process sale: ' . $e->getMessage();
-        }
-
+        
+        $_SESSION['error'] = $error;
         $conn->close();
         header('Location: /pos/public/sales/pos');
         exit;
     }
+
+    // Calculate totals
+    $subtotal = 0;
+    foreach ($cart as $item) {
+        $subtotal += $item['price'] * $item['quantity'];
+    }
+    $tax = $subtotal * 0.16;
+    $total = $subtotal + $tax - $discount;
+
+    if ($amountPaid < $total) {
+        $error = 'Insufficient amount paid.';
+        error_log("Checkout failed: Insufficient amount paid. Paid: $amountPaid, Required: $total");
+        
+        if ($isAjax) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => $error]);
+            exit;
+        }
+        
+        $_SESSION['error'] = $error;
+        $conn->close();
+        header('Location: /pos/public/sales/pos');
+        exit;
+    }
+
+    // Begin transaction
+    $conn->begin_transaction();
+    try {
+        // Verify user exists
+        $stmt = $conn->prepare("SELECT id FROM users WHERE id = ?");
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        if (!$stmt->get_result()->fetch_assoc()) {
+            throw new Exception("Invalid user_id: $userId");
+        }
+        $stmt->close();
+
+        // Insert sale
+        $query = "INSERT INTO sales (user_id, total, payment_method, timestamp, customer_id, discount) 
+                VALUES (?, ?, ?, NOW(), ?, ?)";
+        $stmt = $conn->prepare($query);
+        if ($stmt === false) {
+            throw new Exception("Prepare failed for sales insert: " . $conn->error);
+        }
+        $stmt->bind_param("idssd", $userId, $total, $paymentMethod, $customerId, $discount);
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to insert sale: " . $stmt->error);
+        }
+        $saleId = $conn->insert_id;
+        $stmt->close();
+
+        // Insert sale items and update stock
+        $query = "INSERT INTO sale_items (sale_id, product_id, quantity, price) 
+                VALUES (?, ?, ?, ?)";
+        $stmt = $conn->prepare($query);
+        if ($stmt === false) {
+            throw new Exception("Prepare failed for sale_items insert: " . $conn->error);
+        }
+
+        foreach ($cart as $productId => $item) {
+            $productId = (int)$productId;
+            
+            // Verify product exists and has sufficient stock
+            $checkStmt = $conn->prepare("SELECT stock FROM products WHERE id = ? FOR UPDATE");
+            $checkStmt->bind_param("i", $productId);
+            $checkStmt->execute();
+            $result = $checkStmt->get_result();
+            
+            if ($row = $result->fetch_assoc()) {
+                if ($row['stock'] < $item['quantity']) {
+                    throw new Exception("Insufficient stock for product ID $productId");
+                }
+            } else {
+                throw new Exception("Product ID $productId not found");
+            }
+            $checkStmt->close();
+
+            // Insert sale item
+            $stmt->bind_param("iiid", $saleId, $productId, $item['quantity'], $item['price']);
+            if (!$stmt->execute()) {
+                throw new Exception("Failed to insert sale item for product ID $productId: " . $stmt->error);
+            }
+
+            // Update product stock
+            $updateQuery = "UPDATE products SET stock = stock - ? WHERE id = ?";
+            $updateStmt = $conn->prepare($updateQuery);
+            if ($updateStmt === false) {
+                throw new Exception("Prepare failed for stock update: " . $conn->error);
+            }
+            $updateStmt->bind_param("ii", $item['quantity'], $productId);
+            if (!$updateStmt->execute()) {
+                throw new Exception("Failed to update stock for product ID $productId: " . $updateStmt->error);
+            }
+            $updateStmt->close();
+        }
+        $stmt->close();
+
+        $conn->commit();
+        error_log("Sale completed successfully. Sale ID: $saleId, User ID: $userId, Total: $total");
+
+        // Prepare receipt data
+        $receiptData = [
+            'cart' => $cart,
+            'subtotal' => $subtotal,
+            'tax' => $tax,
+            'discount' => $discount,
+            'total' => $total,
+            'amount_paid' => $amountPaid,
+            'payment_method' => $paymentMethod,
+            'cashier_name' => $_SESSION['user']['name'] ?? 'Unknown',
+            'sale_id' => $saleId,
+            'timestamp' => date('Y-m-d H:i:s')
+        ];
+        $_SESSION['receipt_data'] = $receiptData;
+        $_SESSION['cart'] = [];
+
+        if ($isAjax) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Sale completed successfully',
+                'receipt_data' => $receiptData
+            ]);
+            exit;
+        }
+
+        $_SESSION['success'] = 'Sale completed successfully.';
+        header('Location: /pos/public/sales/pos');
+        exit;
+
+    } catch (\Exception $e) {
+        $conn->rollback();
+        $error = 'Failed to process sale: ' . $e->getMessage();
+        error_log("Checkout failed: " . $e->getMessage());
+        
+        if ($isAjax) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => $error]);
+            exit;
+        }
+        
+        $_SESSION['error'] = $error;
+        header('Location: /pos/public/sales/pos');
+        exit;
+    } finally {
+        $conn->close();
+    }
+}
 }

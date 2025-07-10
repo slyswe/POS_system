@@ -39,6 +39,69 @@ $categories = $categories ?? [
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* Product List Styling */
+        #product-list {
+            gap: 1rem;
+        }
+
+        .product-item {
+            border-radius: 0.75rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 1px solid #e2e8f0;
+        }
+
+        .product-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .product-item img {
+            max-height: 100%;
+            max-width: 100%;
+            object-fit: contain;
+        }
+
+        .add-to-cart-btn {
+            transition: all 0.2s ease;
+        }
+
+        .add-to-cart-btn:hover {
+            transform: scale(1.1);
+        }
+
+        /* Quantity controls */
+        .quantity-control {
+            display: flex;
+            align-items: center;
+            background: #f1f5f9;
+            border-radius: 9999px;
+            padding: 0.25rem;
+        }
+
+        .btn-quantity {
+            width: 1.75rem;
+            height: 1.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+            background: #e2e8f0;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-quantity:hover {
+            background: #cbd5e1;
+        }
+
+        .quantity-input {
+            width: 2.5rem;
+            text-align: center;
+            border: none;
+            background: transparent;
+            font-weight: 600;
+        }
         @keyframes scale-in {
             from { opacity: 0; transform: scale(0.9); }
             to { opacity: 1; transform: scale(1); }
@@ -276,7 +339,7 @@ $categories = $categories ?? [
         <!-- Checkout Modal -->
         
         <div id="checkout-modal" class="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-40 transition-opacity duration-300 hidden">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 transform transition-all duration-300 animate-scale-in">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 transform transition-all duration-300 animate-scale-in max-h-[90vh] overflow-y-auto">
                 <div class="p-6 border-b border-slate-200">
                     <h3 class="text-2xl font-semibold text-slate-900">Confirm Purchase</h3>
                 </div>
@@ -455,76 +518,78 @@ $categories = $categories ?? [
 
         // Filter products
         function filterProducts(filter) {
-            try {
-                const productList = document.getElementById('product-list');
-                const baseUrl = document.querySelector('meta[name="base-url"]').content;
+    try {
+        const productList = document.getElementById('product-list');
+        const baseUrl = document.querySelector('meta[name="base-url"]').content;
 
-                console.log('Base URL:', baseUrl);
-                console.log('Filter:', filter);
+        console.log('Base URL:', baseUrl);
+        console.log('Filter:', filter);
 
-                // Highlight active filter
-                document.querySelectorAll('.btn-filter').forEach(btn => btn.classList.remove('active'));
-                if (filter === 'all' || filter === 'frequent' || filter === 'new') {
-                    document.querySelector(`.btn-filter[onclick="filterProducts('${filter}')"]`).classList.add('active');
-                }
-
-                // Show loading state
-                productList.innerHTML = '<div class="loading">Loading products...</div>';
-
-                // Determine endpoint based on filter
-                let url = `${baseUrl}/products/filter?type=${encodeURIComponent(filter)}`;
-                if (filter && !['all', 'frequent', 'new'].includes(filter)) {
-                    url = `${baseUrl}/products/filter?category_id=${encodeURIComponent(filter)}`;
-                }
-
-                console.log('Fetching products from:', url);
-
-                fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    }
-                })
-                .then(response => {
-                    console.log('Response status:', response.status, 'OK:', response.ok, 'URL:', response.url);
-                    // Capture response text for debugging
-                    return response.text().then(text => {
-                        console.log('Response text:', text.substring(0, 200)); // Log first 200 chars
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}, response: ${text.substring(0, 200)}`);
-                        }
-                        return JSON.parse(text);
-                    });
-                })
-                .then(data => {
-                    console.log('Parsed data:', data);
-                    productList.innerHTML = '';
-                    if (data.success && data.products.length > 0) {
-                        data.products.forEach(product => {
-                            const productItem = document.createElement('div');
-                            productItem.className = 'product-item';
-                            productItem.innerHTML = `
-                                <span>${product.name}</span>
-                                <span>${product.price.toFixed(2)} KES</span>
-                                <button class="btn btn-add-product" onclick="addProductToCart('${product.id}')"><i class="fas fa-plus"></i> Add</button>
-                            `;
-                            productList.appendChild(productItem);
-                        });
-                    } else {
-                        productList.innerHTML = '<div class="no-products">No products found.</div>';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching products:', error);
-                    productList.innerHTML = '<div class="no-products">Failed to load products.</div>';
-                    showAlert('error', `Failed to load products: ${error.message}`);
-                });
-            } catch (e) {
-                console.error('Error filtering products:', e);
-                showAlert('error', 'An error occurred while filtering products.');
-            }
+        // Highlight active filter
+        document.querySelectorAll('.btn-filter').forEach(btn => btn.classList.remove('active'));
+        if (filter === 'all' || filter === 'frequent' || filter === 'new') {
+            document.querySelector(`.btn-filter[onclick="filterProducts('${filter}')"]`).classList.add('active');
         }
+
+        // Show loading state
+        productList.innerHTML = '<div class="loading">Loading products...</div>';
+
+        // Determine endpoint based on filter
+        let url = `${baseUrl}/products/filter?type=${encodeURIComponent(filter)}`;
+        if (filter && !['all', 'frequent', 'new'].includes(filter)) {
+            url = `${baseUrl}/products/filter?category_id=${encodeURIComponent(filter)}`;
+        }
+
+        console.log('Fetching products from:', url);
+
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => {
+            console.log('Response status:', response.status, 'OK:', response.ok, 'URL:', response.url);
+            return response.text().then(text => {
+                console.log('Response text:', text.substring(0, 200));
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}, response: ${text.substring(0, 200)}`);
+                }
+                return JSON.parse(text);
+            });
+        })
+        .then(data => {
+            console.log('Parsed data:', data);
+            productList.innerHTML = '';
+            if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+                data.products.forEach(product => {
+                    console.log('Creating productItem for:', product); // Debug
+                    const productItem = document.createElement('div');
+                    console.log('productItem created:', productItem); // Debug
+                    productItem.className = 'product-item';
+                    productItem.innerHTML = `
+                        <span>${product.name}</span>
+                        <span>${product.price.toFixed(2)} KES</span>
+                        <button class="btn btn-add-product" onclick="addProductToCart('${product.id}', event)"><i class="fas fa-plus"></i> Add</button>
+                    `;
+                    productList.appendChild(productItem);
+                });
+            } else {
+                console.log('No products or invalid data:', data);
+                productList.innerHTML = '<div class="no-products">No products found.</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching products:', error);
+            productList.innerHTML = '<div class="no-products">Failed to load products.</div>';
+            showAlert('error', `Failed to load products: ${error.message}`);
+        });
+    } catch (e) {
+        console.error('Error filtering products:', e);
+        showAlert('error', 'An error occurred while filtering products.');
+    }
+}
 
         // Handle product search form submission
         document.querySelector('.search-bar form').addEventListener('submit', function(e) {
@@ -539,79 +604,109 @@ $categories = $categories ?? [
             addProductBySearch(searchTerm);
         });
 
-        // Function to add product by search term
-        async function addProductBySearch(searchTerm) {
-            try {
-                const baseUrl = document.querySelector('meta[name="base-url"]').content;
-                const response = await fetch(`${baseUrl}/products/search?q=${encodeURIComponent(searchTerm)}`, {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    }
-                });
-
-                const data = await response.json();
-
-                if (data.success && data.products.length > 0) {
-                    // Add the first matching product (or implement a selection UI for multiple matches)
-                    addProductToCart(data.products[0].id);
-                    document.getElementById('product-search').value = ''; // Clear the search field
-                } else {
-                    showAlert('error', 'No products found matching your search');
+        document.getElementById('product-search').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const searchTerm = this.value.trim();
+                if (searchTerm) {
+                    searchProducts(searchTerm);
                 }
-            } catch (error) {
-                console.error('Error searching products:', error);
-                showAlert('error', 'Failed to search products');
             }
-        }
+        });
 
+        // Function to add product by search term
+        // New search function
+async function searchProducts(searchTerm) {
+    console.log('searchProducts called with:', searchTerm);
+    try {
+        const baseUrl = document.querySelector('meta[name="base-url"]').content;
+        const response = await fetch(`${baseUrl}/products/search?q=${encodeURIComponent(searchTerm)}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        displaySearchResults(data.products);
+    } catch (error) {
+        console.error('Search error:', error);
+        showAlert('error', 'Failed to search products');
+    }
+}
+
+function displaySearchResults(products) {
+    const productList = document.getElementById('product-list');
+    productList.innerHTML = '';
+    
+    if (products.length === 0) {
+        productList.innerHTML = '<div class="col-span-full text-center py-8 text-slate-500">No products found</div>';
+        return;
+    }
+    
+    products.forEach(product => {
+        const productItem = document.createElement('div');
+        productItem.className = 'product-item bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow';
+        productItem.innerHTML = `
+            <div class="p-4">
+                <div class="h-40 bg-slate-100 rounded-lg mb-3 flex items-center justify-center">
+                    ${product.image ? `<img src="${product.image}" alt="${product.name}" class="h-full object-contain">` : 
+                    `<i class="fas fa-box-open text-4xl text-slate-400"></i>`}
+                </div>
+                <h3 class="font-semibold text-slate-800 truncate">${product.name}</h3>
+                <div class="flex justify-between items-center mt-2">
+                    <span class="font-bold text-blue-600">KSh ${product.price.toFixed(2)}</span>
+                    <button onclick="addProductToCart('${product.id}', event)" 
+                            class="add-to-cart-btn bg-blue-100 text-blue-600 p-2 rounded-full hover:bg-blue-200 transition">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        productList.appendChild(productItem);
+    });
+}
         // Add product to cart
-        function addProductToCart(productId) {
+        async function addProductToCart(productId, event) {
             try {
                 const baseUrl = document.querySelector('meta[name="base-url"]').content;
-                console.log('Adding product with ID:', productId);
-                console.log('POST URL:', `${baseUrl}/sales/pos`);
-
-                const formData = new FormData();
-                formData.append('product_id', productId);
-                formData.append('add_to_cart', 'true');
-
-                fetch(`${baseUrl}/sales/pos`, {
+                const response = await fetch(`${baseUrl}/sales/pos`, {
                     method: 'POST',
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest'
                     },
-                    body: formData
-                })
-                .then(response => {
-                    console.log('Response status:', response.status, 'OK:', response.ok);
-                    return response.text().then(text => {
-                        console.log('Response text:', text.substring(0, 200));
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}, response: ${text.substring(0, 200)}`);
-                        }
-                        return JSON.parse(text);
-                    });
-                })
-                .then(data => {
-                    console.log('Parsed response:', data);
-                    if (data.success) {
-                        // Update client-side cart
-                        updateCartWithProduct(productId);
-                    } else {
-                        showAlert('error', data.message || 'Failed to add product to cart.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error adding product:', error);
-                    showAlert('error', `Failed to add product to cart: ${error.message}`);
+                    body: `product_id=${productId}&add_to_cart=true`
                 });
-            } catch (e) {
-                console.error('Error in addProductToCart:', e);
-                showAlert('error', 'An error occurred while adding product to cart.');
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update cart display immediately without refresh
+                    updateCartDisplay(data.cart);
+                    updateTotal(data.subtotal);
+                    
+                    // Visual feedback
+                    if (event) {
+                        const btn = event.target.closest('.add-to-cart-btn') || event.target.closest('.btn-add-product');
+                        if (btn) {
+                            btn.innerHTML = '<i class="fas fa-check"></i>';
+                            btn.classList.add('bg-green-100', 'text-green-600');
+                            setTimeout(() => {
+                                btn.innerHTML = '<i class="fas fa-plus"></i>';
+                                btn.classList.remove('bg-green-100', 'text-green-600');
+                            }, 1000);
+                        }
+                    }
+                } else {
+                    showAlert('error', data.message || 'Failed to add product');
+                }
+            } catch (error) {
+                console.error('Add to cart error:', error);
+                showAlert('error', 'Failed to add product');
             }
         }
+
 
         // Initialize client-side cart from session
         let cart = <?php echo json_encode($_SESSION['cart'] ?? []); ?>;
@@ -656,57 +751,88 @@ $categories = $categories ?? [
             }
         }
 
-        function updateCartDisplay() {
-            const cartItems = document.querySelector('.cart-items tbody') || document.createElement('tbody');
-            const cartContainer = document.querySelector('.cart-items') || document.createElement('div');
-            cartContainer.className = 'cart-items';
-            const emptyCart = document.querySelector('.empty-cart');
-
-            if (Object.keys(cart).length === 0) {
-                emptyCart.style.display = 'flex';
-                cartContainer.style.display = 'none';
+        // Update cart display function
+        function updateCartDisplay(cartData) {
+            const cartItemsContainer = document.getElementById('cart-items');
+            
+            if (!cartData || Object.keys(cartData).length === 0) {
+                cartItemsContainer.innerHTML = `
+                    <div class="h-full flex flex-col justify-center items-center text-center text-slate-400">
+                        <i class="fas fa-shopping-cart text-6xl mb-4"></i>
+                        <p class="text-lg font-medium">Your cart is empty</p>
+                        <p class="text-sm">Add products using the search or popular items.</p>
+                    </div>
+                `;
                 return;
             }
-
-            emptyCart.style.display = 'none';
-            cartContainer.style.display = 'block';
-            cartItems.innerHTML = '';
-
-            let subtotal = 0;
-            for (const [id, item] of Object.entries(cart)) {
-                const total = item.price * item.quantity;
-                subtotal += total;
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${item.name}</td>
-                    <td>
-                        <form method="POST" action="/pos/public/sales/pos" class="quantity-form">
-                            <input type="hidden" name="product_id" value="${id}">
-                            <div class="quantity-control">
-                                <button type="submit" name="decrease_qty" class="btn-quantity" ${item.quantity <= 1 ? 'disabled' : ''}><i class="fas fa-minus"></i></button>
-                                <input type="number" name="quantity" value="${item.quantity}" min="0" max="${item.stock}" class="quantity-input" onchange="updateQuantity('${id}', this.value)">
-                                <button type="submit" name="increase_qty" class="btn-quantity" ${item.quantity >= item.stock ? 'disabled' : ''}><i class="fas fa-plus"></i></button>
-                            </div>
-                        </form>
-                    </td>
-                    <td><span class="money">${item.price.toFixed(2)}</span> KES</td>
-                    <td><span class="money">${total.toFixed(2)}</span> KES</td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn btn-discount" onclick="applyItemDiscount('${id}')"><i class="fas fa-percentage"></i></button>
-                            <form method="POST" action="/pos/public/sales/pos" style="display:inline;">
+            
+            let html = `
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-slate-600">
+                            <th class="p-3">Item</th>
+                            <th class="p-3">Qty</th>
+                            <th class="p-3">Price</th>
+                            <th class="p-3">Total</th>
+                            <th class="p-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            for (const [id, item] of Object.entries(cartData)) {
+                html += `
+                    <tr class="border-t border-slate-200">
+                        <td class="p-3">${item.name}</td>
+                        <td class="p-3">
+                            <form method="POST" action="/pos/public/sales/pos" class="quantity-form">
                                 <input type="hidden" name="product_id" value="${id}">
-                                <button type="submit" name="remove_from_cart" class="btn btn-remove"><i class="fas fa-trash"></i></button>
+                                <div class="flex items-center bg-slate-100 rounded-full">
+                                    <button type="submit" name="decrease_qty" class="p-2 text-slate-600 hover:text-red-500 transition">
+                                        <i class="fas fa-minus"></i>
+                                    </button>
+                                    <input type="number" name="quantity" value="${item.quantity}" min="0" max="${item.stock}" 
+                                        class="w-12 text-center bg-transparent border-none text-sm font-bold" readonly>
+                                    <button type="submit" name="increase_qty" class="p-2 text-slate-600 hover:text-green-500 transition">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
                             </form>
-                        </div>
-                    </td>
+                        </td>
+                        <td class="p-3">KSh ${item.price.toFixed(2)}</td>
+                        <td class="p-3">KSh ${(item.price * item.quantity).toFixed(2)}</td>
+                        <td class="p-3">
+                            <div class="flex gap-2">
+                                <button class="p-2 text-slate-600 hover:text-blue-500 transition" 
+                                        onclick="applyItemDiscount('${id}')">
+                                    <i class="fas fa-percentage"></i>
+                                </button>
+                                <form method="POST" action="/pos/public/sales/pos" style="display:inline;">
+                                    <input type="hidden" name="product_id" value="${id}">
+                                    <button type="submit" name="remove_from_cart" class="p-2 text-slate-600 hover:text-red-500 transition">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
                 `;
-                cartItems.appendChild(row);
             }
-
-            cartContainer.appendChild(cartItems);
-            document.querySelector('.cart-panel').appendChild(cartContainer);
+            
+            html += `</tbody></table>`;
+            cartItemsContainer.innerHTML = html;
+            
+            // Update quantity form submissions to use AJAX
+            document.querySelectorAll('.quantity-form').forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    updateQuantity(formData);
+                });
+            });
         }
+
+        
 
         function updateQuantity(productId, newQuantity) {
             try {
@@ -1158,6 +1284,8 @@ function updateModalTotal() {
     document.getElementById('modal-change').value = change.toFixed(2);
 }
 // Update the main payment form when modal inputs change
+
+
 document.getElementById('modal-amount-paid').addEventListener('input', function() {
     document.getElementById('amount_paid').value = this.value;
     updateModalTotal();
@@ -1171,101 +1299,85 @@ document.getElementById('modal-discount').addEventListener('input', function() {
 
         // Checkout modal functions
         function openCheckoutModal() {
-            const summaryHTML = generateCheckoutSummary();
-            document.getElementById('checkout-summary').innerHTML = summaryHTML;
-            const paymentForm = document.getElementById('payment-form');
-            const paymentSection = document.querySelector('.payment-section');
-            paymentSection.innerHTML = '';
-            Array.from(paymentForm.elements).forEach(element => {
-                if (element.type !== 'button' && element.type !== 'submit') {
-                    const clone = element.cloneNode(true);
-                    paymentSection.appendChild(clone);
+            // Calculate totals
+            const subtotal = <?php echo $subtotal ?? 0; ?>;
+            const tax = subtotal * 0.16;
+            const discount = parseFloat(document.getElementById('discount').value) || 0;
+            const total = subtotal + tax - discount;
+            const amountPaid = parseFloat(document.getElementById('amount_paid').value) || 0;
+            const change = Math.max(0, amountPaid - total);
+            
+            // Update modal display
+            document.getElementById('modal-subtotal').textContent = `KSh ${subtotal.toFixed(2)}`;
+            document.getElementById('modal-tax').textContent = `KSh ${tax.toFixed(2)}`;
+            document.getElementById('modal-discount-amount').textContent = `-KSh ${discount.toFixed(2)}`;
+            document.getElementById('modal-grand-total').textContent = `KSh ${total.toFixed(2)}`;
+            document.getElementById('modal-amount-paid').value = amountPaid.toFixed(2);
+            document.getElementById('modal-change').value = change.toFixed(2);
+            
+            // Show modal
+            document.getElementById('checkout-modal').classList.remove('hidden');
+        }
+
+        // Update when amount paid changes
+        document.getElementById('modal-amount-paid').addEventListener('input', function() {
+            const total = parseFloat(document.getElementById('modal-grand-total').textContent.replace('KSh ', ''));
+            const amountPaid = parseFloat(this.value) || 0;
+            const change = Math.max(0, amountPaid - total);
+            document.getElementById('modal-change').value = change.toFixed(2);
+        });
+
+        async function confirmCheckout(event) {
+            event.preventDefault();
+            
+            // Validate payment
+            const amountPaid = parseFloat(document.getElementById('modal-amount-paid').value) || 0;
+            const total = parseFloat(document.getElementById('modal-grand-total').textContent.replace('KSh ', ''));
+            
+            if (amountPaid < total) {
+                showAlert('error', 'Amount paid must cover the total');
+                return;
+            }
+            
+            // Disable button to prevent double submission
+            event.target.disabled = true;
+            
+            try {
+                const baseUrl = document.querySelector('meta[name="base-url"]').content;
+                const formData = new FormData(document.getElementById('payment-form'));
+                
+                const response = await fetch(`${baseUrl}/sales/checkout`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Generate receipt
+                    generateReceipt(data.receipt_data);
+                    
+                    // Close modal and reset form
+                    closeCheckoutModal();
+                    document.getElementById('payment-form').reset();
+                    
+                    // Redirect after a short delay
+                    setTimeout(() => {
+                        window.location.href = `${baseUrl}/sales/pos`;
+                    }, 2000);
+                } else {
+                    showAlert('error', data.message || 'Checkout failed');
+                    event.target.disabled = false;
                 }
-            });
-            const modal = document.getElementById('checkout-modal');
-            modal.style.display = 'flex';
-            setTimeout(() => {
-                modal.classList.add('active');
-            }, 10);
-            document.body.classList.add('modal-open');
-            document.addEventListener('focus', trapFocus, true);
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') closeCheckoutModal();
-            });
+            } catch (error) {
+                console.error('Checkout error:', error);
+                showAlert('error', 'Checkout failed. Please try again.');
+                event.target.disabled = false;
+            }
         }
-
-        function closeCheckoutModal() {
-            const modal = document.getElementById('checkout-modal');
-            modal.classList.remove('active');
-            setTimeout(() => {
-                modal.style.display = 'none';
-            }, 300);
-            document.body.classList.remove('modal-open');
-            document.removeEventListener('focus', trapFocus, true);
-        }
-
-       function confirmCheckout(event) {
-    event.preventDefault();
-    
-    // Get values from modal
-    const amountPaid = parseFloat(document.getElementById('modal-amount-paid').value) || 0;
-    const discount = parseFloat(document.getElementById('modal-discount').value) || 0;
-    const total = parseFloat(document.getElementById('modal-grand-total').textContent.replace('KSh ', ''));
-
-    // Validation
-    if (!amountPaid) {
-        showAlert('error', 'Please enter amount paid');
-        return false;
-    }
-    
-    if (amountPaid < total) {
-        showAlert('error', 'Amount paid must cover the total');
-        return false;
-    }
-
-    // Update main form values
-    document.getElementById('amount_paid').value = amountPaid;
-    document.getElementById('discount').value = discount;
-    
-    // Disable the confirm button to prevent multiple submissions
-    const confirmButton = event.target;
-    confirmButton.disabled = true;
-
-    // Submit the form via AJAX
-    const form = document.getElementById('payment-form');
-    const formData = new FormData(form);
-    
-    fetch(form.action, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Generate receipt with the returned data
-            generateReceipt(data.receipt_data);
-            // Redirect after a delay to allow receipt printing
-            setTimeout(() => {
-                window.location.href = '/pos/public/sales/pos';
-            }, 1500);
-        } else {
-            showAlert('error', data.message || 'Failed to process sale');
-            confirmButton.disabled = false;
-        }
-    })
-    .catch(error => {
-        console.error('Checkout failed:', error);
-        showAlert('error', 'Failed to process sale: Network error');
-        confirmButton.disabled = false;
-    });
-
-    // Close the modal
-    closeCheckoutModal();
-}
 
 
         function validatePayment() {
@@ -1301,99 +1413,202 @@ document.getElementById('modal-discount').addEventListener('input', function() {
                 </div>`;
             return html;
         }
+        function trapFocus(e) {
+            const modal = document.getElementById('checkout-modal');
+            if (!modal || modal.classList.contains('hidden')) return;
+            const focusableElements = modal.querySelectorAll(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            const firstElement = focusableElements[0];
+            const lastElement = focusableElements[focusableElements.length - 1];
+
+            if (!modal.contains(e.target)) {
+                e.preventDefault();
+                firstElement.focus();
+            }
+        }
+
+        // Handle escape key to close checkout modal
+
+        function handleCheckoutModalEscape(e) {
+            if (e.key === 'Escape') {
+                closeCheckoutModal();
+            }
+        }
+
+        // Update openCheckoutModal to include escape key listener
+        function openCheckoutModal() {
+            try {
+                const subtotal = <?php echo $subtotal ?? 0; ?>;
+                const tax = subtotal * 0.16;
+                const discount = parseFloat(document.getElementById('discount').value) || 0;
+                const total = subtotal + tax - discount;
+                const amountPaid = parseFloat(document.getElementById('amount_paid').value) || 0;
+                const change = Math.max(0, amountPaid - total);
+
+                document.getElementById('modal-subtotal').textContent = `KSh ${subtotal.toFixed(2)}`;
+                document.getElementById('modal-tax').textContent = `KSh ${tax.toFixed(2)}`;
+                document.getElementById('modal-discount-amount').textContent = `-KSh ${discount.toFixed(2)}`;
+                document.getElementById('modal-grand-total').textContent = `KSh ${total.toFixed(2)}`;
+                document.getElementById('modal-amount-paid').value = amountPaid.toFixed(2);
+                document.getElementById('modal-discount').value = discount.toFixed(2);
+                document.getElementById('modal-change').value = change.toFixed(2);
+
+                const modal = document.getElementById('checkout-modal');
+                modal.classList.remove('hidden');
+                document.body.classList.add('modal-open');
+                document.addEventListener('focus', trapFocus, true);
+                document.addEventListener('keydown', handleCheckoutModalEscape);
+                document.getElementById('modal-amount-paid').focus();
+            } catch (error) {
+                console.error('Error opening checkout modal:', error);
+                showAlert('error', 'Failed to open checkout modal.');
+            }
+        }
+        // Update closeCheckoutModal to remove escape listener
+        window.closeCheckoutModal = function() {
+            try {
+                const modal = document.getElementById('checkout-modal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    document.body.classList.remove('modal-open');
+                    document.removeEventListener('focus', trapFocus, true);
+                    document.removeEventListener('keydown', handleCheckoutModalEscape);
+                    document.getElementById('modal-amount-paid').value = '';
+                    document.getElementById('modal-discount').value = '0';
+                    document.getElementById('modal-change').value = '0';
+                    document.getElementById('product-search').focus();
+                }
+            } catch (error) {
+                console.error('Error closing checkout modal:', error);
+                showAlert('error', 'Failed to close checkout modal.');
+            }
+        };
+
+        function closeCheckoutModal() {
+            try {
+                const modal = document.getElementById('checkout-modal');
+                if (modal) {
+                    modal.classList.add('hidden'); // Hide the modal
+                    document.body.classList.remove('modal-open'); // Remove modal-open class from body
+                    // Remove focus trapping event listener
+                    document.removeEventListener('focus', trapFocus, true);
+                    // Optional: Reset modal inputs
+                    document.getElementById('modal-amount-paid').value = '';
+                    document.getElementById('modal-discount').value = '0';
+                    document.getElementById('modal-change').value = '0';
+                    // Focus back on product search input
+                    document.getElementById('product-search').focus();
+                }
+            } catch (error) {
+                console.error('Error closing checkout modal:', error);
+                showAlert('error', 'Failed to close checkout modal.');
+            }
+        }
 
         // Enhanced receipt generation
 function generateReceipt(receiptData) {
     try {
-        if (!receiptData || !receiptData.cart || Object.keys(receiptData.cart).length === 0) {
-            throw new Error('No receipt data available. Cart is empty or sale was not processed.');
-        }
-
-        const subtotal = receiptData.subtotal;
-        const tax = receiptData.tax;
-        const discount = receiptData.discount;
-        const total = receiptData.total;
-        const amountPaid = receiptData.amount_paid;
-        const change = Math.max(0, amountPaid - total);
-        const paymentMethod = receiptData.payment_method;
-        const cashierName = receiptData.cashier_name;
-        const saleId = receiptData.sale_id;
-        const timestamp = receiptData.timestamp;
-
         // Create a new window for printing
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
-            throw new Error('Popup blocked. Please allow popups for this site.');
+            throw new Error('Popup blocked. Please allow popups for receipts.');
         }
         
-        // Build receipt HTML
-        const receiptHTML = `
+        // Format receipt HTML
+        printWindow.document.write(`
             <!DOCTYPE html>
             <html>
             <head>
                 <title>Receipt</title>
                 <style>
-                    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-                    .receipt { width: 80mm; margin: 0 auto; }
-                    .text-center { text-align: center; }
-                    .text-right { text-align: right; }
-                    .bold { font-weight: bold; }
-                    .mt-1 { margin-top: 0.25rem; }
-                    .mt-2 { margin-top: 0.5rem; }
-                    .mt-4 { margin-top: 1rem; }
-                    .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
-                    .border-bottom { border-bottom: 1px dashed #000; }
-                    .border-top { border-top: 1px dashed #000; }
-                    table { width: 100%; border-collapse: collapse; }
-                    td { padding: 2px 0; }
+                    body { font-family: Arial, sans-serif; width: 80mm; margin: 0 auto; padding: 10px; }
+                    .header { text-align: center; margin-bottom: 10px; }
+                    .title { font-weight: bold; font-size: 18px; }
+                    .date { font-size: 12px; color: #555; }
+                    .divider { border-top: 1px dashed #000; margin: 5px 0; }
+                    table { width: 100%; border-collapse: collapse; margin: 5px 0; }
+                    td { padding: 3px 0; }
                     td:last-child { text-align: right; }
+                    .total { font-weight: bold; }
+                    .footer { text-align: center; margin-top: 10px; font-size: 12px; }
                 </style>
             </head>
             <body onload="window.print();window.close();">
-                <div class="receipt">
-                    <h2 class="text-center bold">Point of Sale</h2>
-                    <p class="text-center mt-1">${timestamp}</p>
-                    
-                    <div class="border-bottom py-1 mt-2">
-                        <p>Sale ID: ${saleId}</p>
-                        <p>Cashier: ${cashierName}</p>
-                        <p>Payment: ${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
-                    </div>
-                    
-                    <table class="mt-2">
-                        ${Object.entries(receiptData.cart).map(([id, item]) => `
-                            <tr>
-                                <td>${item.name} x ${item.quantity}</td>
-                                <td>${(item.price * item.quantity).toFixed(2)}</td>
-                            </tr>
-                        `).join('')}
-                    </table>
-                    
-                    <div class="border-top mt-2">
-                        <table>
-                            <tr><td>Subtotal:</td><td>${subtotal.toFixed(2)}</td></tr>
-                            <tr><td>Tax (16%):</td><td>${tax.toFixed(2)}</td></tr>
-                            <tr><td>Discount:</td><td>-${discount.toFixed(2)}</td></tr>
-                            <tr class="bold"><td>Total:</td><td>${total.toFixed(2)}</td></tr>
-                            <tr><td>Amount Paid:</td><td>${amountPaid.toFixed(2)}</td></tr>
-                            <tr><td>Change:</td><td>${change.toFixed(2)}</td></tr>
-                        </table>
-                    </div>
-                    
-                    <p class="text-center mt-4">Thank you for shopping with us!</p>
+                <div class="header">
+                    <div class="title">Point of Sale</div>
+                    <div class="date">${new Date().toLocaleString()}</div>
+                </div>
+                
+                <div class="divider"></div>
+                
+                <table>
+                    <tr>
+                        <td>Sale ID:</td>
+                        <td>${receiptData.sale_id}</td>
+                    </tr>
+                    <tr>
+                        <td>Cashier:</td>
+                        <td>${receiptData.cashier_name}</td>
+                    </tr>
+                </table>
+                
+                <div class="divider"></div>
+                
+                <table>
+                    ${Object.values(receiptData.cart).map(item => `
+                        <tr>
+                            <td>${item.name} x ${item.quantity}</td>
+                            <td>${(item.price * item.quantity).toFixed(2)}</td>
+                        </tr>
+                    `).join('')}
+                </table>
+                
+                <div class="divider"></div>
+                
+                <table>
+                    <tr>
+                        <td>Subtotal:</td>
+                        <td>${receiptData.subtotal.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td>Tax (16%):</td>
+                        <td>${receiptData.tax.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td>Discount:</td>
+                        <td>-${receiptData.discount.toFixed(2)}</td>
+                    </tr>
+                    <tr class="total">
+                        <td>Total:</td>
+                        <td>${receiptData.total.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td>Amount Paid:</td>
+                        <td>${receiptData.amount_paid.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td>Change:</td>
+                        <td>${(receiptData.amount_paid - receiptData.total).toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td>Payment Method:</td>
+                        <td>${receiptData.payment_method.charAt(0).toUpperCase() + receiptData.payment_method.slice(1)}</td>
+                    </tr>
+                </table>
+                
+                <div class="footer">
+                    <div>Thank you for shopping with us!</div>
+                    <div>Items can be exchanged within 7 days with receipt</div>
                 </div>
             </body>
             </html>
-        `;
+        `);
         
-        printWindow.document.open();
-        printWindow.document.write(receiptHTML);
         printWindow.document.close();
-        
-        showAlert('success', 'Receipt generated successfully.');
     } catch (error) {
-        console.error('Error generating receipt:', error);
-        showAlert('error', `Failed to generate receipt: ${error.message}`);
+        console.error('Receipt generation error:', error);
+        showAlert('error', 'Failed to generate receipt. ' + error.message);
     }
 }
 // Move trapFocus outside of generateReceipt
@@ -1406,6 +1621,27 @@ function trapFocus(e) {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+
+    const searchInput = document.getElementById('product-search');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const searchTerm = this.value.trim();
+                if (searchTerm) {
+                    searchProducts(searchTerm);
+                }
+            }
+        });
+    }
+
+    // Add similar checks for other event listeners
+    const amountPaidInput = document.getElementById('amount_paid');
+    if (amountPaidInput) {
+        amountPaidInput.addEventListener('input', updateTotal);
+    }
+    
+
     updateTotal();
     filterProducts('all');
     document.getElementById('product-search').focus();
@@ -1413,6 +1649,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle receipt generation if we have receipt data in session
     if (typeof initialReceiptData !== 'undefined' && initialReceiptData && Object.keys(initialReceiptData.cart).length > 0) {
         generateReceipt(initialReceiptData);
+    }
+
+    const cancelButton = document.querySelector('#checkout-modal button[onclick="closeCheckoutModal()"]');
+    if (cancelButton) {
+        cancelButton.addEventListener('click', window.closeCheckoutModal);
     }
 });
     </script>
